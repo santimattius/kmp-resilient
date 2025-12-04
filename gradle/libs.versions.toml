@@ -6,10 +6,10 @@ android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
 
-composeBom = "2025.11.00"
-androidx-lifecycle = "2.9.4"
+composeBom = "2025.12.00"
+androidx-lifecycle = "2.10.0"
 
-androidx-activity = "1.11.0"
+androidx-activity = "1.12.1"
 androidx-appcompat = "1.7.1"
 androidx-core = "1.17.0"
 
