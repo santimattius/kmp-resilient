@@ -11,9 +11,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-
         setContent {
-            App()
+            ResilientExample()
         }
     }
 }
@@ -21,5 +20,5 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    App()
+    ResilientExample()
 }
