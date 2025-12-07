@@ -1,7 +1,7 @@
 [versions]
 agp = "8.13.1"
 kotlin = "2.2.21"
-
+mavenPublish = "0.34.0"
 android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
@@ -66,3 +66,4 @@ androidKMPLibrary = { id = "com.android.kotlin.multiplatform.library", version.r
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPublish" }
