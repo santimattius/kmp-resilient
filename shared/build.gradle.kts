@@ -1,4 +1,3 @@
-import com.vanniktech.maven.publish.SonatypeHost
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -9,7 +8,7 @@ plugins {
 }
 
 group = "io.github.santimattius.resilient"
-version = "1.0.0-ALPHA02"
+version = "1.0.0-ALPHA01"
 
 kotlin {
     androidLibrary {
@@ -48,7 +47,7 @@ kotlin {
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    publishToMavenCentral()
 
     signAllPublications()
 
