@@ -1,9 +1,9 @@
 name: Check
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 jobs:
   publish:
     name: Release build and publish
