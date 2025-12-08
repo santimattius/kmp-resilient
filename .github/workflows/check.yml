@@ -5,8 +5,8 @@ on:
   pull_request:
     branches: [ main ]
 jobs:
-  publish:
-    name: Release build and publish
+  check:
+    name: Verify Code
     runs-on: macOS-latest
     steps:
       - name: Check out code
