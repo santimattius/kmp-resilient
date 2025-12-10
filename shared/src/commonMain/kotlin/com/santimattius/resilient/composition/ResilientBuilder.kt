@@ -108,31 +108,35 @@ class ResilientBuilder {
  * Builds a [ResilientPolicy] by composing configured policies.
  *
  * The policies are applied in a specific order, wrapping the execution block (`block`).
- * The order of execution starts from the innermost policy and proceeds outwards.
+ * The order of execution starts from the outermost policy and proceeds inwards.
  *
- * Execution Order (from inner to outer):
- * 1. `hedging`
- * 2. `bulkhead`
- * 3. `rateLimiter`
- * 4. `circuitBreaker`
- * 5. `retry`
- * 6. `timeout`
- * 7. `cache`
- * 8. `fallback`
+ * Execution Order (from outer to inner):
+ * 1. `fallback`
+ * 2. `cache`
+ * 3. `timeout`
+ * 4. `retry`
+ * 5. `circuitBreaker`
+ * 6. `rateLimiter`
+ * 7. `bulkhead`
+ * 8. `hedging`
  *
- * This means a request will first pass through the `fallback` and `cache` policies, then `timeout`, and so on, until it reaches the core execution block.
+ * This means a request will first pass through the `fallback` and `cache` policies, then `timeout`, and so on, until it reaches the core execution block, which is wrapped by the `hedging` policy.
  * The `fallback` policy is the last line of defense, catching any exceptions that bubble up through all other policies.
  *
  * Example: `fallback` -> `cache` -> `timeout` -> `retry` -> `...` -> `hedging` -> `block()`
  *
+ * @param resilientScope The [ResilientScope] in which the policies will operate, typically tied to a coroutine scope.
  * @param block A lambda with a [ResilientBuilder] receiver to configure the desired resilience policies.
  * @return A [ResilientPolicy] instance that can be used to execute operations with the configured policies.
  */
-fun resilient(block: ResilientBuilder.() -> Unit): ResilientPolicy {
+fun resilient(
+    resilientScope: ResilientScope,
+    block: ResilientBuilder.() -> Unit
+): ResilientPolicy {
     val builder = ResilientBuilder().apply(block)
     val events = MutableSharedFlow<ResilientEvent>(extraBufferCapacity = 0)
 
-    val cache = builder.cacheConfig?.let { InMemoryCachePolicy(it) }
+    val cache = builder.cacheConfig?.let { InMemoryCachePolicy(it, resilientScope) }
     val timeout = builder.timeoutConfig?.let { DefaultTimeoutPolicy(it) }
 
     val retryCfg = builder.retryConfig
