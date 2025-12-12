@@ -1,20 +1,22 @@
 package com.santimattius.resilient.circuitbreaker
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlin.concurrent.Volatile
 import kotlin.math.max
-import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.ExperimentalTime
 
 /**
  * A default, thread-safe implementation of the [CircuitBreaker] interface.
  *
  * This class protects a system from failures by stopping the execution of operations
- * when a certain failure threshold is reached. It follows the state machine pattern with
+ * when a certain failure threshold is reached. It follows a state machine pattern with
  * three states: [CircuitState.CLOSED], [CircuitState.OPEN], and [CircuitState.HALF_OPEN].
  *
  * - **[CircuitState.CLOSED]**: The default state. All calls are executed. If the number of failures
@@ -27,14 +29,20 @@ import kotlin.time.ExperimentalTime
  *   (up to the `successThreshold`), the circuit transitions back to [CircuitState.CLOSED].
  *   If any of these test calls fail, it transitions back to [CircuitState.OPEN].
  *
- * The behavior of the circuit breaker is determined by the provided [CircuitBreakerConfig].
- * State changes can be observed via the [state] flow or the `onStateChanged` callback.
+ * ### Thread Safety and Concurrency
  *
- * @param config The configuration for the circuit breaker's behavior.
- * @param onStateChanged An optional callback that is invoked whenever the circuit breaker's state changes.
+ * This implementation is designed to be highly concurrent and thread-safe.
+ *
+ * - **State Checks**: A fast-path check is used for the common [CircuitState.CLOSED] state,
+ *   which avoids locking and allows maximum concurrency. For [CircuitState.OPEN] and
+ *   [CircuitState.HALF_OPEN] states, a `Mutex` is used to ensure atomic state transitions.
+ * - **State Updates**: All state modifications are protected by a `Mutex`.
+ * - **User Code Execution**: The provided `block` of code is always executed *outside* the lock
+ *   to prevent holding the mutex for an extended period.
  */
 class DefaultCircuitBreaker(
     private val config: CircuitBreakerConfig,
+    private val timeSource: TimeSource = SystemTimeSource,
     private val onStateChanged: (CircuitState) -> Unit = {}
 ) : CircuitBreaker {
 
@@ -42,56 +50,185 @@ class DefaultCircuitBreaker(
     private val _state = MutableStateFlow(CircuitState.CLOSED)
     override val state: StateFlow<CircuitState> get() = _state
 
+    @Volatile
     private var failureCount: Int = 0
+
+    @Volatile
     private var successCount: Int = 0
+
+    @Volatile
     private var openUntilMs: Long = 0L
+
+    @Volatile
     private var halfOpenAllowedCalls: Int = 0
 
     override suspend fun <T> execute(block: suspend () -> T): T {
-        val now = getTimeMillis()
-        return mutex.withLock {
-            when (_state.value) {
-                CircuitState.OPEN -> {
-                    if (now >= openUntilMs) {
-                        transitionTo(CircuitState.HALF_OPEN)
-                        halfOpenAllowedCalls = max(1, config.halfOpenMaxCalls)
-                    } else {
-                        throw CircuitBreakerOpenException(
-                            currentState = _state.value,
-                            retryAfter = (openUntilMs - now).milliseconds
-                        )
-                    }
+        val currentState = _state.value
+
+        if (currentState == CircuitState.CLOSED) {
+            return executeBlock(block)
+        }
+
+        return when (currentState) {
+            CircuitState.OPEN -> handleOpenState(block)
+            CircuitState.HALF_OPEN -> handleHalfOpenState(block)
+            CircuitState.CLOSED -> executeBlock(block) // Should not reach here due to fast path
+        }
+    }
+
+    private suspend fun <T> handleOpenState(block: suspend () -> T): T {
+        val result = mutex.withLock {
+            val now = getTimeMillis()
+            val state = _state.value
+
+            when {
+                state != CircuitState.OPEN -> {
+                    return@withLock StateCheckResult.StateChanged(state)
                 }
 
-                CircuitState.HALF_OPEN -> {
-                    if (halfOpenAllowedCalls <= 0) {
-                        throw CircuitBreakerOpenException(
-                            currentState = _state.value,
-                            retryAfter = max(0, openUntilMs - now).milliseconds
-                        )
-                    }
+                openUntilMs in 1..now -> {
+                    transitionTo(CircuitState.HALF_OPEN)
+                    halfOpenAllowedCalls = max(1, config.halfOpenMaxCalls)
                     halfOpenAllowedCalls--
+                    StateCheckResult.AllowedWithCounterDecrement
                 }
 
-                CircuitState.CLOSED -> {}
+                else -> {
+                    val retryAfter = if (openUntilMs > 0) {
+                        (openUntilMs - now).milliseconds
+                    } else {
+                        config.timeout
+                    }
+                    StateCheckResult.Rejected(retryAfter)
+                }
             }
-        }.let {
-            try {
-                val result = block()
+        }
+
+        return when (result) {
+            is StateCheckResult.AllowedWithCounterDecrement -> {
+                try {
+                    executeBlock(block)
+                } catch (e: CancellationException) {
+                    // If cancelled after transitioning to HALF_OPEN, restore the allowed call counter
+                    // since the call didn't complete
+                    withContext(NonCancellable) {
+                        mutex.withLock {
+                            if (_state.value == CircuitState.HALF_OPEN) {
+                                halfOpenAllowedCalls++
+                            }
+                        }
+                    }
+                    throw e
+                }
+            }
+
+            is StateCheckResult.Allowed -> {
+                executeBlock(block)
+            }
+
+            is StateCheckResult.Rejected -> throw CircuitBreakerOpenException(
+                currentState = CircuitState.OPEN,
+                retryAfter = result.retryAfter
+            )
+
+            is StateCheckResult.StateChanged -> {
+                when (result.newState) {
+                    CircuitState.CLOSED -> executeBlock(block)
+                    CircuitState.HALF_OPEN -> handleHalfOpenState(block)
+                    CircuitState.OPEN -> handleOpenState(block) // Retry
+                }
+            }
+        }
+    }
+
+    private suspend fun <T> handleHalfOpenState(block: suspend () -> T): T {
+        val result = mutex.withLock {
+            val state = _state.value
+            when {
+                state != CircuitState.HALF_OPEN -> {
+                    return@withLock StateCheckResult.StateChanged(state)
+                }
+
+                halfOpenAllowedCalls > 0 -> {
+                    halfOpenAllowedCalls--
+                    StateCheckResult.AllowedWithCounterDecrement
+                }
+
+                else -> {
+                    StateCheckResult.Rejected(null)
+                }
+            }
+        }
+
+        return when (result) {
+            is StateCheckResult.AllowedWithCounterDecrement -> {
+                try {
+                    executeBlock(block)
+                } catch (e: CancellationException) {
+                    withContext(NonCancellable) {
+                        mutex.withLock {
+                            if (_state.value == CircuitState.HALF_OPEN) {
+                                halfOpenAllowedCalls++
+                            }
+                        }
+                    }
+                    throw e
+                }
+            }
+
+            is StateCheckResult.Allowed -> {
+                executeBlock(block)
+            }
+
+            is StateCheckResult.Rejected -> throw CircuitBreakerOpenException(
+                currentState = CircuitState.HALF_OPEN,
+                retryAfter = result.retryAfter
+            )
+
+            is StateCheckResult.StateChanged -> {
+                when (result.newState) {
+                    CircuitState.CLOSED -> executeBlock(block)
+                    CircuitState.OPEN -> handleOpenState(block)
+                    CircuitState.HALF_OPEN -> handleHalfOpenState(block) // Retry
+                }
+            }
+        }
+    }
+
+    private suspend fun <T> executeBlock(block: suspend () -> T): T {
+        return try {
+            val result = block()
+            // Use NonCancellable to ensure state is updated even if coroutine is cancelled
+            // after block completes but before onSuccess is called
+            withContext(NonCancellable) {
                 onSuccess()
-                result
-            } catch (t: Throwable) {
-                onFailure(t)
-                throw t
             }
+            result
+        } catch (e: CancellationException) {
+            // Cancellation is not a failure - rethrow immediately without updating state
+            // This ensures cancelled operations don't affect circuit breaker state
+            throw e
+        } catch (t: Throwable) {
+            // Use NonCancellable to ensure state is updated even if coroutine is cancelled
+            // after onFailure is called
+            withContext(NonCancellable) {
+                onFailure(t)
+            }
+            throw t
         }
     }
 
     private suspend fun onSuccess() {
         mutex.withLock {
             when (_state.value) {
-                CircuitState.CLOSED -> failureCount = 0
-                CircuitState.OPEN -> { /* ignored */}
+                CircuitState.CLOSED -> {
+                    failureCount = 0
+                }
+
+                CircuitState.OPEN -> {
+                    // Ignore - should not happen, but safe to ignore
+                }
+
                 CircuitState.HALF_OPEN -> {
                     successCount++
                     if (successCount >= config.successThreshold) {
@@ -106,6 +243,7 @@ class DefaultCircuitBreaker(
 
     private suspend fun onFailure(t: Throwable) {
         if (!config.shouldRecordFailure(t)) return
+
         mutex.withLock {
             when (_state.value) {
                 CircuitState.CLOSED -> {
@@ -115,9 +253,12 @@ class DefaultCircuitBreaker(
                     }
                 }
 
-                CircuitState.OPEN -> { /* remain open */}
+                CircuitState.OPEN -> {
+                    // Remain open - no action needed
+                }
 
                 CircuitState.HALF_OPEN -> {
+                    // Any failure in HALF_OPEN immediately opens the circuit
                     transitionOpenFor(config.timeout)
                 }
             }
@@ -125,14 +266,16 @@ class DefaultCircuitBreaker(
     }
 
     private fun transitionOpenFor(duration: Duration) {
-        openUntilMs = getTimeMillis() + duration.inWholeMilliseconds
+        val now = getTimeMillis()
+        val durationMs = duration.inWholeMilliseconds
+        // Ensure we add at least 1ms to avoid immediate timeout
+        openUntilMs = now + max(1, durationMs)
         successCount = 0
         transitionTo(CircuitState.OPEN)
     }
 
-    @OptIn(ExperimentalTime::class)
     private fun getTimeMillis(): Long {
-        return Clock.System.now().toEpochMilliseconds()
+        return timeSource.currentTimeMillis()
     }
 
     private fun transitionTo(new: CircuitState) {
@@ -141,5 +284,17 @@ class DefaultCircuitBreaker(
             config.onStateChange(new)
             onStateChanged(new)
         }
+    }
+
+    /**
+     * A sealed class representing the internal result of a state check before executing a call.
+     * This is used within the synchronized blocks to determine the next action without holding the lock
+     * while executing the user's code block. It helps manage state transitions and execution flow cleanly.
+     */
+    private sealed class StateCheckResult {
+        object Allowed : StateCheckResult()
+        object AllowedWithCounterDecrement : StateCheckResult()
+        data class Rejected(val retryAfter: Duration?) : StateCheckResult()
+        data class StateChanged(val newState: CircuitState) : StateCheckResult()
     }
 }
