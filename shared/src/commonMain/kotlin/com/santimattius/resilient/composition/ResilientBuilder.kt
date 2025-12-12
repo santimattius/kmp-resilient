@@ -163,9 +163,12 @@ fun resilient(
     }
 
     val rateLimiter = builder.rateLimiterConfig?.let { cfg ->
-        DefaultRateLimiter(cfg) { wait ->
-            events.emit(ResilientEvent.RateLimited(wait))
-        }
+        DefaultRateLimiter(
+            config = cfg,
+            onRateLimited = { wait ->
+                events.emit(ResilientEvent.RateLimited(wait))
+            }
+        )
     }
 
     val bulkhead = builder.bulkheadConfig?.let { DefaultBulkhead(it) }
