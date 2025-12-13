@@ -1,10 +1,10 @@
 package com.santimattius.resilient.hedging
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.selects.select
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -43,8 +43,9 @@ class HedgingConfig {
  * If the first attempt to complete is successful, its result is returned immediately, and all other
  * running attempts are canceled to save resources.
  *
- * If the first attempt to complete fails with an exception, this implementation currently cancels
- * all other attempts and re-throws the exception.
+ * If the first attempt to complete fails with an exception, the policy waits for other attempts to
+ * complete. If any subsequent attempt succeeds, its result is returned. If all attempts fail,
+ * the exception from the first failing attempt is re-thrown.
  *
  * @param config The [HedgingConfig] to configure the behavior of the policy, such as the number of attempts and the delay between them.
  */
@@ -74,29 +75,83 @@ class DefaultHedgingPolicy(
         require(config.attempts >= 1) { "Hedging attempts must be >= 1" }
         if (config.attempts == 1) return@coroutineScope block()
 
+        // Launch all attempts with proper stagger delay
+        // Stagger should be cumulative: attempt 0 starts immediately,
+        // attempt 1 starts after 1*stagger, attempt 2 after 2*stagger, etc.
         val deferreds = (0 until config.attempts).map { idx ->
             async {
-                if (idx > 0 && config.stagger.isPositive()) delay(config.stagger.inWholeMilliseconds)
+                // Apply cumulative stagger delay before executing the block
+                if (idx > 0 && config.stagger.isPositive()) {
+                    delay(idx * config.stagger.inWholeMilliseconds)
+                }
                 block()
             }
         }
-        try {
-            val winnerIndex = select {
-                deferreds.forEachIndexed { index, d ->
-                    d.onAwait { _ -> index }
+
+        val activeIndices = deferreds.indices.toMutableSet()
+        var firstFailure: Throwable? = null
+
+        while (activeIndices.isNotEmpty()) {
+            // Build list of active deferreds with their original indices
+            val activeDeferreds = deferreds.mapIndexedNotNull { index, d ->
+                if (index in activeIndices) index to d else null
+            }
+
+            if (activeDeferreds.isEmpty()) break
+            // Use select to wait for first completion
+            // onAwait works for both completed and pending deferreds
+            val (winnerIndex, winner) = select {
+                activeDeferreds.forEach { (index, d) ->
+                    d.onAwait { index to d }
                 }
             }
-            val value = deferreds[winnerIndex].getCompleted()
-            //TODO: cancel others?
-            deferreds.forEachIndexed { index, d -> if (index != winnerIndex) d.cancel() }
-            deferreds.forEachIndexed { index, d -> if (index != winnerIndex) d.join() }
-            value
-        } catch (t: Throwable) {
-            // if the first completion was a failure, let others continue, then rethrow last failure if all fail
-            // For simplicity: cancel all and rethrow
-            deferreds.forEach { it.cancel() }
-            deferreds.joinAll()
-            throw t
+
+            // Since onAwait guarantees the deferred is completed, await() will return immediately
+            // Use runCatching to safely handle both success and failure cases
+            val result = runCatching {
+                winner.await()
+            }
+
+            if (result.isSuccess) {
+                // Success! Cancel all other attempts and return
+                activeIndices.forEach { idx ->
+                    if (idx != winnerIndex) {
+                        deferreds[idx].cancel()
+                    }
+                }
+                // Wait for cancellation to complete
+                activeIndices.forEach { idx ->
+                    if (idx != winnerIndex) {
+                        runCatching { deferreds[idx].join() }
+                    }
+                }
+                return@coroutineScope result.getOrThrow()
+            } else {
+                // Completion was a failure
+                val failure = result.exceptionOrNull()
+
+                // CancellationException should propagate immediately
+                if (failure is CancellationException) {
+                    // Cancel all other attempts and propagate cancellation
+                    activeIndices.forEach { idx ->
+                        if (idx != winnerIndex) {
+                            deferreds[idx].cancel()
+                        }
+                    }
+                    throw failure
+                }
+
+                // Remember the first failure
+                if (failure != null && firstFailure == null) {
+                    firstFailure = failure
+                }
+
+                // Remove the failed attempt and continue waiting for others
+                activeIndices.remove(winnerIndex)
+            }
         }
+
+        // All attempts failed - throw the first failure
+        throw firstFailure ?: IllegalStateException("All hedging attempts failed")
     }
 }

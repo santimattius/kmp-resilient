@@ -134,7 +134,7 @@ fun resilient(
     block: ResilientBuilder.() -> Unit
 ): ResilientPolicy {
     val builder = ResilientBuilder().apply(block)
-    val events = MutableSharedFlow<ResilientEvent>(extraBufferCapacity = 0)
+    val events = MutableSharedFlow<ResilientEvent>(extraBufferCapacity = 10)
 
     val cache = builder.cacheConfig?.let { InMemoryCachePolicy(it, resilientScope) }
     val timeout = builder.timeoutConfig?.let { DefaultTimeoutPolicy(it) }
@@ -156,9 +156,9 @@ fun resilient(
             original(state)
             // emitting only state-to-state transitions requires knowledge of previous; handled inside impl
         }
-        DefaultCircuitBreaker(cfg) { new ->
+        DefaultCircuitBreaker(cfg) { new, old ->
             // best effort: we do not have previous here; emit change to new with placeholder
-            events.tryEmit(ResilientEvent.CircuitStateChanged(new, new))
+            events.tryEmit(ResilientEvent.CircuitStateChanged(old, new))
         }
     }
 
