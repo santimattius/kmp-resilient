@@ -1,5 +1,7 @@
 package com.santimattius.resilient.bulkhead
 
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -42,6 +44,9 @@ class DefaultBulkhead(
 
     private suspend fun tryAcquirePermit(): Boolean {
         if (semaphore.tryAcquire()) return true
+
+        currentCoroutineContext().ensureActive()
+
         var canEnqueueWaiter: Boolean
         mutex.withLock {
             canEnqueueWaiter = queuedWaiters < config.maxWaitingCalls
@@ -49,17 +54,16 @@ class DefaultBulkhead(
         }
         if (!canEnqueueWaiter) return false
         return try {
-            if (config.timeout == null) {
+            val timeout = config.timeout
+            if (timeout == null) {
                 semaphore.acquire()
                 true
             } else {
-                withTimeout(config.timeout!!.inWholeMilliseconds) {
+                withTimeout(timeout.inWholeMilliseconds) {
                     semaphore.acquire()
-                    true
                 }
+                true
             }
-        } catch (_: Throwable) {
-            false
         } finally {
             mutex.withLock { queuedWaiters-- }
         }
