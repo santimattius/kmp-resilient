@@ -19,11 +19,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.santimattius.resilient.composition.ResilientScope
 import com.santimattius.resilient.composition.resilient
 import com.santimattius.resilient.retry.ExponentialBackoff
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.coroutines.ContinuationInterceptor
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -68,7 +71,8 @@ fun ResilientExample() {
 
             LaunchedEffect(runTrigger.intValue) {
                 if (runTrigger.intValue == 0) return@LaunchedEffect
-                val policy = resilient {
+                val dispatcher = this.coroutineContext[ContinuationInterceptor] as CoroutineDispatcher
+                val policy = resilient(ResilientScope(dispatcher)) {
                     timeout { timeout = 2.seconds }
                     retry {
                         maxAttempts = 3

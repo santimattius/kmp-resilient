@@ -1,5 +1,8 @@
 package com.santimattius.resilient.circuitbreaker
 
+import com.santimattius.resilient.circuitbreaker.CircuitState.CLOSED
+import com.santimattius.resilient.circuitbreaker.CircuitState.HALF_OPEN
+import com.santimattius.resilient.circuitbreaker.CircuitState.OPEN
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
