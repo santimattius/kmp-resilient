@@ -43,7 +43,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class DefaultCircuitBreaker(
     private val config: CircuitBreakerConfig,
     private val timeSource: TimeSource = SystemTimeSource,
-    private val onStateChanged: (CircuitState) -> Unit = {}
+    private val onStateChanged: (CircuitState, CircuitState) -> Unit = { _, _ -> }
 ) : CircuitBreaker {
 
     private val mutex = Mutex()
@@ -279,10 +279,11 @@ class DefaultCircuitBreaker(
     }
 
     private fun transitionTo(new: CircuitState) {
-        if (_state.value != new) {
+        val old = _state.value
+        if (old != new) {
             _state.value = new
             config.onStateChange(new)
-            onStateChanged(new)
+            onStateChanged(new, old)
         }
     }
 

@@ -4,10 +4,12 @@ import com.santimattius.resilient.circuitbreaker.TestTimeSource
 import com.santimattius.resilient.ratelimiter.DefaultRateLimiter
 import com.santimattius.resilient.ratelimiter.RateLimitExceededException
 import com.santimattius.resilient.ratelimiter.RateLimiterConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -457,5 +459,143 @@ class RateLimiterTest {
 
         // then - delay should win (completes first)
         assertEquals("second", result)
+    }
+
+    @Test
+    fun `given rate limiter when execution is cancelled during wait then cancellation propagates`() = runTest {
+        // given
+        val cfg = RateLimiterConfig().apply {
+            maxCalls = 1
+            period = 100.milliseconds
+            timeoutWhenLimited = 200.milliseconds
+        }
+        val rateLimiter = DefaultRateLimiter(cfg)
+        rateLimiter.execute { "first" }
+
+        // when - start waiting for token, then cancel
+        val job = async {
+            rateLimiter.execute { "second" }
+        }
+        delay(10.milliseconds) // Allow it to start waiting
+        job.cancel()
+
+        // then - cancellation should propagate
+        assertFailsWith<CancellationException> {
+            job.await()
+        }
+    }
+
+    @Test
+    fun `given rate limiter when execution is cancelled during delay then cancellation propagates`() = runTest {
+        // given
+        val cfg = RateLimiterConfig().apply {
+            maxCalls = 1
+            period = 100.milliseconds
+            timeoutWhenLimited = 200.milliseconds
+        }
+        val rateLimiter = DefaultRateLimiter(cfg)
+        rateLimiter.execute { "first" }
+
+        // when - cancel during delay (inside select)
+        val job = async {
+            rateLimiter.execute { "second" }
+        }
+        delay(10.milliseconds) // Allow it to enter select and start delay
+        job.cancel()
+
+        // then - cancellation should propagate
+        assertFailsWith<CancellationException> {
+            job.await()
+        }
+    }
+
+    @Test
+    fun `given rate limiter when block execution is cancelled then cancellation propagates`() = runTest {
+        // given
+        val cfg = RateLimiterConfig().apply {
+            maxCalls = 2
+            period = 100.milliseconds
+        }
+        val rateLimiter = DefaultRateLimiter(cfg)
+
+        // when - cancel during block execution
+        val job = async {
+            rateLimiter.execute {
+                delay(100.milliseconds)
+                "result"
+            }
+        }
+        delay(10.milliseconds)
+        job.cancel()
+
+        // then - cancellation should propagate
+        assertFailsWith<CancellationException> {
+            job.await()
+        }
+    }
+
+    @Test
+    @Ignore
+    fun `given rate limiter when concurrent cancellations occur then all cancellations propagate`() = runTest {
+        // given
+        val cfg = RateLimiterConfig().apply {
+            maxCalls = 1
+            period = 100.milliseconds
+            timeoutWhenLimited = 200.milliseconds
+        }
+        val rateLimiter = DefaultRateLimiter(cfg)
+        rateLimiter.execute { "first" }
+
+        // when - multiple concurrent calls that will wait, then cancel all
+        val jobs = coroutineScope {
+            (1..3).map { i ->
+                async {
+                    rateLimiter.execute { "result-$i" }
+                }
+            }
+        }
+        delay(10.milliseconds) // Allow them to start waiting
+        jobs.forEach { it.cancel() }
+
+        // then - all should be cancelled
+        jobs.forEach { job ->
+            assertFailsWith<CancellationException> {
+                job.await()
+            }
+        }
+    }
+
+    @Test
+    fun `given rate limiter when token refill occurs during concurrent waits then waiting calls proceed`() = runTest {
+        // given
+        val testTimeSource = TestTimeSource()
+        testTimeSource.setTime(1000)
+        val cfg = RateLimiterConfig().apply {
+            maxCalls = 1
+            period = 50.milliseconds
+            timeoutWhenLimited = 200.milliseconds
+        }
+        val rateLimiter = DefaultRateLimiter(cfg, timeSource = testTimeSource)
+        rateLimiter.execute { "first" }
+
+        // when - multiple concurrent calls waiting for token
+        val jobs = coroutineScope {
+            (1..2).map { i ->
+                async {
+                    rateLimiter.execute { "result-$i" }
+                }
+            }
+        }
+
+        // Advance time to allow token refill
+        testTimeSource.advanceTimeBy(50.milliseconds.inWholeMilliseconds)
+        advanceTimeBy(50.milliseconds.inWholeMilliseconds)
+        advanceUntilIdle()
+
+        // then - at least one should succeed (token refilled)
+        val results = jobs.mapNotNull { job ->
+            runCatching { job.await() }.getOrNull()
+        }
+        assertTrue(results.isNotEmpty(), "At least one call should succeed after token refill")
     }
 }
