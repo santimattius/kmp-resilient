@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.github.santimattius.resilient"
-version = "1.0.0-ALPHA04"
+version = "1.0.0"
 
 kotlin {
     androidLibrary {
