@@ -1,23 +1,24 @@
 package com.santimattius.resilient.composition
 
 import com.santimattius.resilient.ResilientPolicy
+import com.santimattius.resilient.annotations.ResilientExperimentalApi
 import com.santimattius.resilient.bulkhead.BulkheadConfig
 import com.santimattius.resilient.bulkhead.DefaultBulkhead
-import com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig
-import com.santimattius.resilient.circuitbreaker.DefaultCircuitBreaker
-import com.santimattius.resilient.ratelimiter.RateLimiterConfig
-import com.santimattius.resilient.ratelimiter.DefaultRateLimiter
-import com.santimattius.resilient.retry.RetryPolicyConfig
-import com.santimattius.resilient.retry.DefaultRetryPolicy
-import com.santimattius.resilient.timeout.TimeoutConfig
-import com.santimattius.resilient.timeout.DefaultTimeoutPolicy
-import com.santimattius.resilient.telemetry.ResilientEvent
 import com.santimattius.resilient.cache.CacheConfig
 import com.santimattius.resilient.cache.InMemoryCachePolicy
+import com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig
+import com.santimattius.resilient.circuitbreaker.DefaultCircuitBreaker
 import com.santimattius.resilient.fallback.FallbackConfig
 import com.santimattius.resilient.fallback.FallbackPolicy
 import com.santimattius.resilient.hedging.DefaultHedgingPolicy
 import com.santimattius.resilient.hedging.HedgingConfig
+import com.santimattius.resilient.ratelimiter.DefaultRateLimiter
+import com.santimattius.resilient.ratelimiter.RateLimiterConfig
+import com.santimattius.resilient.retry.DefaultRetryPolicy
+import com.santimattius.resilient.retry.RetryPolicyConfig
+import com.santimattius.resilient.telemetry.ResilientEvent
+import com.santimattius.resilient.timeout.DefaultTimeoutPolicy
+import com.santimattius.resilient.timeout.TimeoutConfig
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -71,6 +72,7 @@ class ResilientBuilder {
     internal var fallbackConfig: FallbackConfig<Any?>? = null
     internal var hedgingConfig: HedgingConfig? = null
     internal var compositionOrder: CompositionOrder = CompositionOrder.DEFAULT
+    internal var compositionOrderExplicitlySet: Boolean = false
 
     fun retry(config: RetryPolicyConfig.() -> Unit) {
         retryConfig = (retryConfig ?: RetryPolicyConfig()).apply(config)
@@ -118,7 +120,7 @@ class ResilientBuilder {
      * Example:
      * ```kotlin
      * import com.santimattius.resilient.composition.OrderablePolicyType
-     * 
+     *
      * resilient(scope) {
      *     compositionOrder(listOf(
      *         OrderablePolicyType.CACHE,        // Check cache first (after Fallback)
@@ -134,8 +136,14 @@ class ResilientBuilder {
      * }
      * ```
      */
+
+    @ResilientExperimentalApi
     fun compositionOrder(order: List<OrderablePolicyType>) {
+        require(order.isNotEmpty()){
+            "Composition order cannot be empty"
+        }
         compositionOrder = CompositionOrder(order)
+        compositionOrderExplicitlySet = true
     }
 }
 
@@ -257,34 +265,55 @@ fun resilient(
         ): Execute<T> {
             // Build wrappers in the configured order (outermost to innermost)
             // Note: We reverse the order because we wrap from innermost to outermost
-            val wrappers = compositionOrder.order.reversed().mapNotNull { policyType ->
-                when (policyType) {
-                    PolicyType.FALLBACK -> fallback?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
-                    }
-                    PolicyType.CACHE -> cache?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
-                    }
-                    PolicyType.TIMEOUT -> timeout?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
-                    }
-                    PolicyType.RETRY -> retry?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
-                    }
-                    PolicyType.CIRCUIT_BREAKER -> circuitBreaker?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
-                    }
-                    PolicyType.RATE_LIMITER -> rateLimiter?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
-                    }
-                    PolicyType.BULKHEAD -> bulkhead?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
-                    }
-                    PolicyType.HEDGING -> hedging?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+            val wrappers = if (builder.compositionOrderExplicitlySet) {
+                compositionOrder.order.reversed().mapNotNull { policyType ->
+                    when (policyType) {
+                        PolicyType.FALLBACK -> fallback?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
+
+                        PolicyType.CACHE -> cache?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
+
+                        PolicyType.TIMEOUT -> timeout?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
+
+                        PolicyType.RETRY -> retry?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
+
+                        PolicyType.CIRCUIT_BREAKER -> circuitBreaker?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
+
+                        PolicyType.RATE_LIMITER -> rateLimiter?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
+
+                        PolicyType.BULKHEAD -> bulkhead?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
+
+                        PolicyType.HEDGING -> hedging?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
                     }
                 }
+            } else {
+                buildList {
+                    if (hedging != null) add { next -> { hedging.execute { next() } } }
+                    if (bulkhead != null) add { next -> { bulkhead.execute { next() } } }
+                    if (rateLimiter != null) add { next -> { rateLimiter.execute { next() } } }
+                    if (circuitBreaker != null) add { next -> { circuitBreaker.execute { next() } } }
+                    if (retry != null) add { next -> { retry.execute { next() } } }
+                    if (timeout != null) add { next -> { timeout.execute { next() } } }
+                    if (cache != null) add { next -> { cache.execute { next() } } }
+                    if (fallback != null) add { next -> { fallback.execute { next() } } }
+                }
             }
+
 
             var composed: Execute<T> = block
             for (wrap in wrappers) {
