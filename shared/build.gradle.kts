@@ -22,6 +22,25 @@ kotlin {
         withHostTestBuilder {}.configure {}
     }
 
+    jvm {
+        compilations.all {
+            compilerOptions.configure {
+                jvmTarget.set(JvmTarget.JVM_11)
+            }
+        }
+        testRuns["test"].executionTask.configure {
+            useJUnitPlatform()
+        }
+    }
+
+    js(IR) {
+        browser()
+        nodejs()
+    }
+
+    // Native targets - Tier 1 only
+    macosArm64()
+
     listOf(
         iosX64(),
         iosArm64(),
@@ -43,6 +62,12 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.turbine)
+        }
+        val jvmTest by getting {
+            dependencies {
+                implementation(libs.junit5.api)
+                runtimeOnly(libs.junit5.engine)
+            }
         }
     }
 }
