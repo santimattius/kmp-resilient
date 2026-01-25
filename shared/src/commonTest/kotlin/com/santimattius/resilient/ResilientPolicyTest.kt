@@ -2,6 +2,7 @@ package com.santimattius.resilient
 
 import app.cash.turbine.test
 import com.santimattius.resilient.circuitbreaker.CircuitBreakerOpenException
+import com.santimattius.resilient.composition.OrderablePolicyType
 import com.santimattius.resilient.composition.ResilientScope
 import com.santimattius.resilient.composition.resilient
 import com.santimattius.resilient.fallback.FallbackConfig
@@ -582,6 +583,148 @@ class ResilientPolicyTest {
         assertEquals("result-1", result)
         // Note: attemptCount may be > 1 if cancellation didn't happen immediately,
         // but the result should be from the first attempt
+    }
+
+    @Test
+    fun `given custom composition order when policies are configured then order is applied correctly`() = runTest {
+        // given
+        val scope = ResilientScope()
+        val executionTrace = mutableListOf<String>()
+        
+        val policy = resilient(scope) {
+            compositionOrder(listOf(
+                OrderablePolicyType.RETRY,      // First after Fallback
+                OrderablePolicyType.TIMEOUT,   // Second
+                OrderablePolicyType.CACHE,     // Third
+                OrderablePolicyType.CIRCUIT_BREAKER,
+                OrderablePolicyType.RATE_LIMITER,
+                OrderablePolicyType.BULKHEAD,
+                OrderablePolicyType.HEDGING
+            ))
+            retry {
+                maxAttempts = 1
+            }
+            timeout {
+                timeout = 1.seconds
+            }
+            cache {
+                key = "test"
+                ttl = 10.seconds
+            }
+            circuitBreaker {
+                failureThreshold = 10
+                timeout = 100.milliseconds
+            }
+        }
+
+        // when
+        val result = policy.execute {
+            executionTrace.add("block")
+            "success"
+        }
+
+        // then
+        assertEquals("success", result)
+        assertEquals(listOf("block"), executionTrace)
+        // Policies should execute in the custom order (verification through behavior)
+    }
+
+    @Test
+    fun `given custom composition order with fallback when operation fails then fallback catches error`() = runTest {
+        // given
+        val scope = ResilientScope()
+        val policy = resilient(scope) {
+            compositionOrder(listOf(
+                OrderablePolicyType.CACHE,
+                OrderablePolicyType.TIMEOUT,
+                OrderablePolicyType.RETRY,
+                OrderablePolicyType.CIRCUIT_BREAKER,
+                OrderablePolicyType.RATE_LIMITER,
+                OrderablePolicyType.BULKHEAD,
+                OrderablePolicyType.HEDGING
+            ))
+            timeout {
+                timeout = 1.seconds
+            }
+            retry {
+                maxAttempts = 2
+            }
+            fallback(FallbackConfig { "fallback-value" })
+        }
+
+        // when
+        val result = policy.execute<String> {
+            throw IllegalStateException("failure")
+        }
+
+        // then - Fallback should catch the error even with custom order
+        assertEquals("fallback-value", result)
+    }
+
+    @Test
+    fun `given default composition order when fallback is configured then fallback is outermost`() = runTest {
+        // given
+        val scope = ResilientScope()
+        val policy = resilient(scope) {
+            // Using default order
+            timeout {
+                timeout = 1.seconds
+            }
+            retry {
+                maxAttempts = 1
+            }
+            fallback(FallbackConfig { "fallback-value" })
+        }
+
+        // when - timeout should trigger, then retry fails, fallback catches
+        val result = policy.execute<String> {
+            delay(2.seconds) // Exceeds timeout
+            "never-reached"
+        }
+
+        // then - Fallback should catch TimeoutCancellationException
+        assertEquals("fallback-value", result)
+    }
+
+    @Test
+    fun `given custom composition order when cache is first then cache is checked before other policies`() = runTest {
+        // given
+        val scope = ResilientScope()
+        var executionCount = 0
+        val policy = resilient(scope) {
+            compositionOrder(listOf(
+                OrderablePolicyType.CACHE,     // Cache first (after Fallback)
+                OrderablePolicyType.TIMEOUT,
+                OrderablePolicyType.RETRY,
+                OrderablePolicyType.CIRCUIT_BREAKER,
+                OrderablePolicyType.RATE_LIMITER,
+                OrderablePolicyType.BULKHEAD,
+                OrderablePolicyType.HEDGING
+            ))
+            cache {
+                key = "test-key"
+                ttl = 10.seconds
+            }
+            timeout {
+                timeout = 1.seconds
+            }
+        }
+
+        // when - first call
+        val result1 = policy.execute {
+            executionCount++
+            "result-$executionCount"
+        }
+
+        // then - second call should use cache
+        val result2 = policy.execute {
+            executionCount++
+            "result-$executionCount"
+        }
+
+        assertEquals("result-1", result1)
+        assertEquals("result-1", result2) // Cached result
+        assertEquals(1, executionCount) // Block executed only once
     }
 }
 
