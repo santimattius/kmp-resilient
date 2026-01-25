@@ -39,9 +39,36 @@ val job = scope.launch {
 ```
 
 ## Composition Order
-Outer → Inner:
+Outer → Inner (default):
 - Fallback → Cache → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → Block
 - Fallback wraps outermost to handle failures after all policies.
+
+### Custom Composition Order
+The composition order is configurable. Use `compositionOrder()` to specify a custom order:
+
+```kotlin
+import com.santimattius.resilient.composition.OrderablePolicyType
+
+val policy = resilient(scope) {
+    compositionOrder(listOf(
+        OrderablePolicyType.CACHE,        // Check cache first (after Fallback)
+        OrderablePolicyType.TIMEOUT,      // Then apply timeout
+        OrderablePolicyType.RETRY,        // Retry on failures
+        OrderablePolicyType.CIRCUIT_BREAKER,
+        OrderablePolicyType.RATE_LIMITER,
+        OrderablePolicyType.BULKHEAD,
+        OrderablePolicyType.HEDGING
+    ))
+    // Fallback is automatically added as the outermost policy
+    // ... configure policies
+}
+```
+
+**Important Notes:**
+- **Fallback is not included** in `OrderablePolicyType` - it is always positioned outermost automatically
+- All orderable policy types (7 total) must be included in the custom order exactly once
+- Fallback must remain outermost to catch all failures from other policies
+- The order affects how policies interact with each other, so choose carefully based on your use case
 
 ---
 

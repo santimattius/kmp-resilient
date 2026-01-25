@@ -70,6 +70,7 @@ class ResilientBuilder {
     internal var cacheConfig: CacheConfig? = null
     internal var fallbackConfig: FallbackConfig<Any?>? = null
     internal var hedgingConfig: HedgingConfig? = null
+    internal var compositionOrder: CompositionOrder = CompositionOrder.DEFAULT
 
     fun retry(config: RetryPolicyConfig.() -> Unit) {
         retryConfig = (retryConfig ?: RetryPolicyConfig()).apply(config)
@@ -102,6 +103,40 @@ class ResilientBuilder {
     fun hedging(config: HedgingConfig.() -> Unit) {
         hedgingConfig = (hedgingConfig ?: HedgingConfig()).apply(config)
     }
+
+    /**
+     * Configures the order in which policies are composed.
+     * Policies are applied from outermost (first in list) to innermost (last in list).
+     *
+     * **Important**: Fallback is always positioned outermost and cannot be included in the order.
+     * It will be automatically prepended to ensure it catches all failures from other policies.
+     *
+     * @param order The list of orderable policy types in the desired composition order.
+     *              Must contain all orderable policy types exactly once.
+     * @throws IllegalArgumentException if the order doesn't contain all orderable policy types or contains duplicates.
+     *
+     * Example:
+     * ```kotlin
+     * import com.santimattius.resilient.composition.OrderablePolicyType
+     * 
+     * resilient(scope) {
+     *     compositionOrder(listOf(
+     *         OrderablePolicyType.CACHE,        // Check cache first (after Fallback)
+     *         OrderablePolicyType.TIMEOUT,       // Then apply timeout
+     *         OrderablePolicyType.RETRY,         // Retry on failures
+     *         OrderablePolicyType.CIRCUIT_BREAKER,
+     *         OrderablePolicyType.RATE_LIMITER,
+     *         OrderablePolicyType.BULKHEAD,
+     *         OrderablePolicyType.HEDGING
+     *     ))
+     *     // Fallback is automatically added as the outermost policy
+     *     // ... configure policies
+     * }
+     * ```
+     */
+    fun compositionOrder(order: List<OrderablePolicyType>) {
+        compositionOrder = CompositionOrder(order)
+    }
 }
 
 /**
@@ -110,7 +145,7 @@ class ResilientBuilder {
  * The policies are applied in a specific order, wrapping the execution block (`block`).
  * The order of execution starts from the outermost policy and proceeds inwards.
  *
- * Execution Order (from outer to inner):
+ * Default Execution Order (from outer to inner):
  * 1. `fallback`
  * 2. `cache`
  * 3. `timeout`
@@ -124,6 +159,11 @@ class ResilientBuilder {
  * The `fallback` policy is the last line of defense, catching any exceptions that bubble up through all other policies.
  *
  * Example: `fallback` -> `cache` -> `timeout` -> `retry` -> `...` -> `hedging` -> `block()`
+ *
+ * The composition order can be customized using [ResilientBuilder.compositionOrder]. This allows you to
+ * change the order in which policies are applied, which can be useful for specific use cases or performance tuning.
+ * Note that `fallback` is always positioned outermost automatically and cannot be configured, ensuring it
+ * can catch all failures from other policies.
  *
  * @param resilientScope The [ResilientScope] in which the policies will operate, typically tied to a coroutine scope.
  * @param block A lambda with a [ResilientBuilder] receiver to configure the desired resilience policies.
@@ -191,6 +231,7 @@ fun resilient(
                     bulkhead = bulkhead,
                     hedging = hedging,
                     fallback = fallback,
+                    compositionOrder = builder.compositionOrder,
                     block = block
                 )
                 val result = composed()
@@ -211,17 +252,38 @@ fun resilient(
             bulkhead: DefaultBulkhead?,
             hedging: DefaultHedgingPolicy?,
             fallback: FallbackPolicy?,
+            compositionOrder: CompositionOrder,
             block: Execute<T>
         ): Execute<T> {
-            val wrappers = buildList<(Execute<T>) -> Execute<T>> {
-                if (hedging != null) add { next -> { hedging.execute { next() } } }
-                if (bulkhead != null) add { next -> { bulkhead.execute { next() } } }
-                if (rateLimiter != null) add { next -> { rateLimiter.execute { next() } } }
-                if (circuitBreaker != null) add { next -> { circuitBreaker.execute { next() } } }
-                if (retry != null) add { next -> { retry.execute { next() } } }
-                if (timeout != null) add { next -> { timeout.execute { next() } } }
-                if (cache != null) add { next -> { cache.execute { next() } } }
-                if (fallback != null) add { next -> { fallback.execute { next() } } }
+            // Build wrappers in the configured order (outermost to innermost)
+            // Note: We reverse the order because we wrap from innermost to outermost
+            val wrappers = compositionOrder.order.reversed().mapNotNull { policyType ->
+                when (policyType) {
+                    PolicyType.FALLBACK -> fallback?.let { policy ->
+                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                    }
+                    PolicyType.CACHE -> cache?.let { policy ->
+                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                    }
+                    PolicyType.TIMEOUT -> timeout?.let { policy ->
+                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                    }
+                    PolicyType.RETRY -> retry?.let { policy ->
+                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                    }
+                    PolicyType.CIRCUIT_BREAKER -> circuitBreaker?.let { policy ->
+                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                    }
+                    PolicyType.RATE_LIMITER -> rateLimiter?.let { policy ->
+                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                    }
+                    PolicyType.BULKHEAD -> bulkhead?.let { policy ->
+                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                    }
+                    PolicyType.HEDGING -> hedging?.let { policy ->
+                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                    }
+                }
             }
 
             var composed: Execute<T> = block
