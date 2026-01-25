@@ -1,6 +1,7 @@
 package com.santimattius.resilient
 
 import app.cash.turbine.test
+import com.santimattius.resilient.annotations.ResilientExperimentalApi
 import com.santimattius.resilient.circuitbreaker.CircuitBreakerOpenException
 import com.santimattius.resilient.composition.OrderablePolicyType
 import com.santimattius.resilient.composition.ResilientScope
@@ -37,7 +38,7 @@ import kotlin.time.Duration.Companion.seconds
  * - Concurrent execution behavior
  * - Error handling and propagation
  */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, ResilientExperimentalApi::class)
 class ResilientPolicyTest {
 
     private val testDispatcher = StandardTestDispatcher()

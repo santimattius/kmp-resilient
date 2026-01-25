@@ -34,11 +34,11 @@ internal class CompositionOrder(
     val order: List<PolicyType> = run {
         val inputOrder = order.distinct()
         
-        require(inputOrder.size == OrderablePolicyType.entries.size) {
+        /* require(inputOrder.size == OrderablePolicyType.entries.size) {
             "CompositionOrder must contain all orderable policy types exactly once. " +
                     "Expected ${OrderablePolicyType.entries.size} types, but got ${inputOrder.size}. " +
                     "Missing: ${OrderablePolicyType.entries.filter { it !in inputOrder }}"
-        }
+        }*/
         
         // Convert OrderablePolicyType to PolicyType and prepend Fallback
         listOf(PolicyType.FALLBACK) + inputOrder.map { orderableType ->

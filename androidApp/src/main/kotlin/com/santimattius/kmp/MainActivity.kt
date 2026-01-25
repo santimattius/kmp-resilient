@@ -20,5 +20,5 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    ResilientExample()
+    //ResilientExample(ResilientViewModel())
 }
