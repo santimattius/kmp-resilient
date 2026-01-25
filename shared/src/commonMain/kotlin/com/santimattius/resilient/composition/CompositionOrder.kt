@@ -25,7 +25,7 @@ package com.santimattius.resilient.composition
  *              Fallback is automatically prepended to the order.
  * @throws IllegalArgumentException if the order doesn't contain all orderable policy types or contains duplicates.
  */
-class CompositionOrder(
+internal class CompositionOrder(
     order: List<OrderablePolicyType>
 ) {
     /**

@@ -4,7 +4,7 @@ package com.santimattius.resilient.composition
  * Represents the different types of resilience policies that can be composed.
  * Each policy type corresponds to a specific resilience strategy.
  */
-enum class PolicyType {
+internal enum class PolicyType {
     FALLBACK,
     CACHE,
     TIMEOUT,
