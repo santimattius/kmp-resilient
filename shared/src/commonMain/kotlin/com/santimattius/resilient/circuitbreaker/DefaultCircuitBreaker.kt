@@ -39,12 +39,28 @@ import kotlin.time.Duration.Companion.milliseconds
  * - **State Updates**: All state modifications are protected by a `Mutex`.
  * - **User Code Execution**: The provided `block` of code is always executed *outside* the lock
  *   to prevent holding the mutex for an extended period.
+ *
+ * @param config The circuit breaker configuration.
+ * @param timeSource Source of current time for open/half-open timeouts; defaults to [SystemTimeSource].
+ * @param onStateChanged Callback invoked on state transition (newState, oldState); used for telemetry.
  */
 class DefaultCircuitBreaker(
     private val config: CircuitBreakerConfig,
     private val timeSource: TimeSource = SystemTimeSource,
     private val onStateChanged: (CircuitState, CircuitState) -> Unit = { _, _ -> }
 ) : CircuitBreaker {
+
+    init {
+        require(config.failureThreshold >= 1) {
+            "failureThreshold must be >= 1, got ${config.failureThreshold}"
+        }
+        require(config.successThreshold >= 1) {
+            "successThreshold must be >= 1, got ${config.successThreshold}"
+        }
+        require(config.halfOpenMaxCalls >= 1) {
+            "halfOpenMaxCalls must be >= 1, got ${config.halfOpenMaxCalls}"
+        }
+    }
 
     private val mutex = Mutex()
     private val _state = MutableStateFlow(CircuitState.CLOSED)
