@@ -7,10 +7,10 @@ import kotlinx.coroutines.CancellationException
  *
  * This class holds the configuration for what action to take when a fallback is triggered.
  *
- * @param T The type of the result that the fallback action will return.
+ * @param T The type of the result that the fallback action will return. Must match the return type of the block
+ *          passed to [FallbackPolicy.execute], otherwise a [ClassCastException] may occur at runtime.
  * @property onFallback A suspend lambda function that is executed when an operation fails (excluding cancellation).
- *                     It receives the `Throwable` that caused the failure and must return a value whose type is
- *                     compatible with the executed block's return type, otherwise a [ClassCastException] may occur at runtime.
+ *                     It receives the `Throwable` that caused the failure and must return a value of type [T].
  */
 class FallbackConfig<T>(
     var onFallback: suspend (Throwable) -> T
@@ -27,9 +27,11 @@ class FallbackConfig<T>(
  * ensuring that the application can continue to function gracefully.
  *
  * @param config The configuration for the fallback policy, specifying the action to take on failure.
+ * @param onFallbackTriggered Optional callback invoked when fallback is used (e.g. for telemetry).
  */
 class FallbackPolicy(
-    private val config: FallbackConfig<Any?>
+    private val config: FallbackConfig<Any?>,
+    private val onFallbackTriggered: (Throwable) -> Unit = {}
 ) {
     /**
      * Executes [block]; on failure (excluding [kotlinx.coroutines.CancellationException]) invokes [FallbackConfig.onFallback] and returns its result.
@@ -43,6 +45,7 @@ class FallbackPolicy(
             block()
         } catch (t: Throwable) {
             if (t is CancellationException) throw t
+            onFallbackTriggered(t)
             config.onFallback(t) as T
         }
     }

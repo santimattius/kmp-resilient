@@ -217,8 +217,24 @@ fun resilient(
     val builder = ResilientBuilder().apply(block)
     val events = MutableSharedFlow<ResilientEvent>(extraBufferCapacity = 10)
 
-    val cache = builder.cacheConfig?.let { InMemoryCachePolicy(it, resilientScope) }
-    val timeoutPolicy = builder.timeoutConfig?.let { DefaultTimeoutPolicy(it) }
+    val cache = builder.cacheConfig?.let { cfg ->
+        InMemoryCachePolicy(
+            config = cfg,
+            scope = resilientScope,
+            onCacheHit = { events.tryEmit(ResilientEvent.CacheHit(cfg.key)) },
+            onCacheMiss = { events.tryEmit(ResilientEvent.CacheMiss(cfg.key)) }
+        )
+    }
+    val timeoutPolicy = builder.timeoutConfig?.let { cfg ->
+        val copy = TimeoutConfig().apply {
+            timeout = cfg.timeout
+            onTimeout = {
+                events.emit(ResilientEvent.TimeoutTriggered(cfg.timeout))
+                cfg.onTimeout()
+            }
+        }
+        DefaultTimeoutPolicy(copy)
+    }
 
     val retryCfg = builder.retryConfig
     val retry = retryCfg?.let { cfg ->
@@ -260,8 +276,16 @@ fun resilient(
     }
 
     val bulkhead = builder.bulkheadConfig?.let { DefaultBulkhead(it) }
-    val hedging = builder.hedgingConfig?.let { DefaultHedgingPolicy(it) }
-    val fallback = builder.fallbackConfig?.let { FallbackPolicy(it) }
+    val hedging = builder.hedgingConfig?.let { cfg ->
+        DefaultHedgingPolicy(cfg) { attemptIndex ->
+            events.tryEmit(ResilientEvent.HedgingUsed(attemptIndex))
+        }
+    }
+    val fallback = builder.fallbackConfig?.let { cfg ->
+        FallbackPolicy(cfg) { t ->
+            events.tryEmit(ResilientEvent.FallbackTriggered(t))
+        }
+    }
 
     return object : ResilientPolicy {
         override val events: SharedFlow<ResilientEvent>

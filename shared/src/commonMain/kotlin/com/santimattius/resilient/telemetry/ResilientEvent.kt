@@ -49,6 +49,36 @@ sealed interface ResilientEvent {
     data class BulkheadRejected(val reason: String) : ResilientEvent
 
     /**
+     * Emitted when the cache returns a valid entry (hit).
+     * @property key The cache key that produced the hit.
+     */
+    data class CacheHit(val key: String) : ResilientEvent
+
+    /**
+     * Emitted when the cache does not have a valid entry and the block is executed (miss).
+     * @property key The cache key that produced the miss.
+     */
+    data class CacheMiss(val key: String) : ResilientEvent
+
+    /**
+     * Emitted when the operation exceeds the configured timeout and is cancelled.
+     * @property timeout The configured timeout duration that was exceeded.
+     */
+    data class TimeoutTriggered(val timeout: Duration) : ResilientEvent
+
+    /**
+     * Emitted when the fallback is used after the operation failed.
+     * @property error The error that triggered the fallback.
+     */
+    data class FallbackTriggered(val error: Throwable) : ResilientEvent
+
+    /**
+     * Emitted when hedging returns a result from a non-primary attempt (attempt index > 0).
+     * @property attemptIndex The 0-based index of the attempt that produced the result.
+     */
+    data class HedgingUsed(val attemptIndex: Int) : ResilientEvent
+
+    /**
      * Emitted after a successful operation, including the total time taken for the execution.
      *
      * @property duration The measured duration of the successful operation.
