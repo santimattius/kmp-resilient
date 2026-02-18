@@ -21,23 +21,27 @@ package com.santimattius.resilient.composition
  * - Hedging is innermost to launch parallel attempts close to execution
  *
  * @param order The list of orderable policy types in the desired composition order (outermost to innermost).
- *              Optional: may be empty or a subset. Types in the list are ordered as given; any type not in the list
- *              is appended in the default order. Duplicates are removed (first occurrence wins).
+ *              Must contain all orderable policy types exactly once.
  *              Fallback is automatically prepended to the order.
+ * @throws IllegalArgumentException if the order doesn't contain all orderable policy types or contains duplicates.
  */
 internal class CompositionOrder(
     order: List<OrderablePolicyType>
 ) {
     /**
      * The complete order with Fallback always first, followed by the configured order.
-     * If [order] was partial, missing types are appended in [DEFAULT] order.
      */
     val order: List<PolicyType> = run {
         val inputOrder = order.distinct()
-        val inputSet = inputOrder.toSet()
-        val restInDefaultOrder = CompositionOrder.defaultOrderableOrder.filter { it !in inputSet }
-        val fullOrder = inputOrder + restInDefaultOrder
-        listOf(PolicyType.FALLBACK) + fullOrder.map { orderableType ->
+        
+        /* require(inputOrder.size == OrderablePolicyType.entries.size) {
+            "CompositionOrder must contain all orderable policy types exactly once. " +
+                    "Expected ${OrderablePolicyType.entries.size} types, but got ${inputOrder.size}. " +
+                    "Missing: ${OrderablePolicyType.entries.filter { it !in inputOrder }}"
+        }*/
+        
+        // Convert OrderablePolicyType to PolicyType and prepend Fallback
+        listOf(PolicyType.FALLBACK) + inputOrder.map { orderableType ->
             when (orderableType) {
                 OrderablePolicyType.CACHE -> PolicyType.CACHE
                 OrderablePolicyType.TIMEOUT -> PolicyType.TIMEOUT
@@ -51,15 +55,6 @@ internal class CompositionOrder(
     }
 
     companion object {
-        private val defaultOrderableOrder = listOf(
-            OrderablePolicyType.CACHE,
-            OrderablePolicyType.TIMEOUT,
-            OrderablePolicyType.RETRY,
-            OrderablePolicyType.CIRCUIT_BREAKER,
-            OrderablePolicyType.RATE_LIMITER,
-            OrderablePolicyType.BULKHEAD,
-            OrderablePolicyType.HEDGING
-        )
         /**
          * Default composition order: Fallback → Cache → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging
          */

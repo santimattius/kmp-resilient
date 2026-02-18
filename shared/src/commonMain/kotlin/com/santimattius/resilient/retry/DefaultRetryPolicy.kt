@@ -1,6 +1,5 @@
 package com.santimattius.resilient.retry
 
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlin.math.min
 import kotlin.random.Random
@@ -26,12 +25,6 @@ class DefaultRetryPolicy(
     private val config: RetryPolicyConfig
 ) : RetryPolicy {
 
-    init {
-        require(config.maxAttempts >= 1) {
-            "maxAttempts must be >= 1, got ${config.maxAttempts}"
-        }
-    }
-
     override suspend fun <T> execute(block: suspend () -> T): T {
         var lastError: Throwable? = null
         var attempt = 0
@@ -39,7 +32,6 @@ class DefaultRetryPolicy(
             try {
                 return block()
             } catch (e: Throwable) {
-                if (e is CancellationException) throw e
                 if (!config.shouldRetry(e)) throw e
                 lastError = e
                 attempt++

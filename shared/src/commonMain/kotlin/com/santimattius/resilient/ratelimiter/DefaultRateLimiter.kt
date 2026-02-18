@@ -42,12 +42,6 @@ class DefaultRateLimiter(
     private val timeSource: TimeSource = SystemTimeSource
 ) : RateLimiter {
 
-    init {
-        require(config.maxCalls >= 1) {
-            "maxCalls must be >= 1, got ${config.maxCalls}"
-        }
-    }
-
     private val mutex = Mutex()
     private var tokens: Int = config.maxCalls
     private var lastRefillMs: Long = timeSource.currentTimeMillis()
