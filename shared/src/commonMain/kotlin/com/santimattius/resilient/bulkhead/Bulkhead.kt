@@ -16,13 +16,6 @@ package com.santimattius.resilient.bulkhead
  * @see BulkheadConfig for configuration options.
  */
 interface Bulkhead {
-    /**
-     * Acquires a permit (or queues), executes [block], then releases the permit.
-     * @param T The return type of the block.
-     * @param block The suspendable operation to run under the bulkhead limit.
-     * @return The result of [block].
-     * @throws BulkheadFullException When no permit is available and the wait queue is full (or wait times out if configured).
-     */
     suspend fun <T> execute(block: suspend () -> T): T
 }
 
@@ -40,11 +33,7 @@ class BulkheadConfig {
 }
 
 /**
- * Exception thrown when the bulkhead cannot accept a new call.
- * This occurs when both the concurrent call limit and the waiting queue are full,
- * or when waiting for a permit exceeds the configured [BulkheadConfig.timeout].
- *
- * @see Bulkhead
- * @see BulkheadConfig
+ * An [Exception] that is thrown when the bulkhead has no more space for new calls.
+ * This occurs when both the concurrent call limit and the waiting queue are full.
  */
 class BulkheadFullException : Exception()

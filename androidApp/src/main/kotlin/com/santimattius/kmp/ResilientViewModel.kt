@@ -22,10 +22,8 @@ class ResilientViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ResilientUiState())
     val uiState: StateFlow<ResilientUiState> = _uiState.asStateFlow()
 
-    private val resilientScope = ResilientScope(dispatcher = Dispatchers.Default)
-
     @OptIn(ResilientExperimentalApi::class)
-    private val policy = resilient(resilientScope) {
+    private val policy = resilient(ResilientScope(dispatcher = Dispatchers.Default)) {
         timeout { timeout = 2.seconds }
         retry {
             maxAttempts = 3
@@ -83,11 +81,6 @@ class ResilientViewModel : ViewModel() {
                 }
             }
         }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        resilientScope.close()
     }
 
     companion object {
