@@ -71,10 +71,14 @@ class CacheConfig {
  *
  * @param config The [CacheConfig] specifying the cache key and time-to-live (TTL).
  * @param scope Optional [ResilientScope] used to launch the cleanup job when [CacheConfig.cleanupInterval] is set.
+ * @param onCacheHit Optional callback invoked when a cache hit occurs (optional telemetry).
+ * @param onCacheMiss Optional callback invoked when the block is executed due to a cache miss (optional telemetry).
  */
 internal class InMemoryCachePolicy(
     private val config: CacheConfig,
-    scope: ResilientScope? = null
+    scope: ResilientScope? = null,
+    private val onCacheHit: (() -> Unit)? = null,
+    private val onCacheMiss: (() -> Unit)? = null
 ) : CachePolicy, AutoCloseable {
 
     private data class Entry(val value: Any?, val expiresAt: Long)
@@ -104,6 +108,7 @@ internal class InMemoryCachePolicy(
         mutex.withLock {
             store[key]?.let { entry ->
                 if (now < entry.expiresAt) {
+                    onCacheHit?.invoke()
                     return@coroutineScope entry.value as T
                 }
                 store.remove(key)
@@ -114,6 +119,7 @@ internal class InMemoryCachePolicy(
             ongoing.getOrPut(key) {
                 async {
                     try {
+                        onCacheMiss?.invoke()
                         val result = block()
                         val expiresAt = currentTimeMillis() + config.ttl.inWholeMilliseconds
                         mutex.withLock {

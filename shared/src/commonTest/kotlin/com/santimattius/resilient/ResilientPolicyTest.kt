@@ -16,6 +16,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -232,10 +233,13 @@ class ResilientPolicyTest {
                 }
             }
 
-            // then - should emit OperationFailure
-            val event = awaitItem()
-            assertIs<ResilientEvent.OperationFailure>(event)
-            assertIs<TimeoutCancellationException>(event.error)
+            // then - should emit TimeoutTriggered then OperationFailure
+            val timeoutEvent = awaitItem()
+            assertIs<ResilientEvent.TimeoutTriggered>(timeoutEvent)
+            assertEquals(50.milliseconds, timeoutEvent.timeout)
+            val failureEvent = awaitItem()
+            assertIs<ResilientEvent.OperationFailure>(failureEvent)
+            assertIs<TimeoutCancellationException>(failureEvent.error)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -460,6 +464,32 @@ class ResilientPolicyTest {
         }
         assertEquals("result-1", result2) // Should be cached
         assertEquals(1, executionCount) // Should not execute again
+    }
+
+    @Test
+    fun `given cache policy when events are collected then emits CacheMiss then CacheHit`() = runTest {
+        val scope = ResilientScope()
+        val policy = resilient(scope) {
+            cache {
+                key = "telemetry-key"
+                ttl = 1.seconds
+            }
+        }
+        policy.events.test {
+            policy.execute { "v1" }
+            val miss = awaitItem()
+            assertIs<ResilientEvent.CacheMiss>(miss)
+            assertEquals("telemetry-key", miss.key)
+            val success = awaitItem()
+            assertIs<ResilientEvent.OperationSuccess>(success)
+            policy.execute { "v2" } // hit
+            val hit = awaitItem()
+            assertIs<ResilientEvent.CacheHit>(hit)
+            assertEquals("telemetry-key", hit.key)
+            val success2 = awaitItem()
+            assertIs<ResilientEvent.OperationSuccess>(success2)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

@@ -27,10 +27,15 @@ suspend fun call(): String = policy.execute { fetchData() }
 
 ## Telemetry
 Observe runtime events from `policy.events` (SharedFlow):
-- RetryAttempt(attempt, error)
-- CircuitStateChanged(from, to)
-- RateLimited(waitTime)
-- OperationSuccess(duration) / OperationFailure(error, duration)
+- **RetryAttempt**(attempt, error)
+- **CircuitStateChanged**(from, to)
+- **RateLimited**(waitTime)
+- **BulkheadRejected**(reason)
+- **CacheHit**(key) / **CacheMiss**(key)
+- **TimeoutTriggered**(timeout)
+- **FallbackTriggered**(error)
+- **HedgingUsed**(attemptIndex)
+- **OperationSuccess**(duration) / **OperationFailure**(error, duration)
 
 ```kotlin
 val job = scope.launch {
@@ -70,6 +75,10 @@ val policy = resilient(scope) {
 - Fallback must remain outermost to catch all failures from other policies
 - The order affects how policies interact with each other, so choose carefully based on your use case
 
+### Timeout vs Retry order
+- **Timeout outer, Retry inner** (default): The timeout applies to the **entire** execution (all retries combined). A single slow attempt can consume the full timeout; if it expires, the whole operation fails.
+- **Retry outer, Timeout inner**: Each **attempt** has its own timeout. You can get more attempts within the same total wall-clock time. Use `compositionOrder(listOf(..., OrderablePolicyType.RETRY, OrderablePolicyType.TIMEOUT, ...))` if you want per-attempt timeout.
+
 ---
 
 ## Features
@@ -86,14 +95,14 @@ val policy = resilient {
 ```
 
 ### Retry
-Retries failing operations according to a backoff strategy and predicate.
+Retries failing operations according to a backoff strategy and predicate. Use **shouldRetry** to avoid retrying non-transient errors (e.g. 4xx client errors); retry only on 5xx, network/IO, or timeouts.
 ```kotlin
 import com.santimattius.resilient.retry.*
 
 val policy = resilient {
     retry {
         maxAttempts = 4
-        shouldRetry = { it is java.io.IOException }
+        shouldRetry = { it is java.io.IOException }  // e.g. only retry IO; do not retry 4xx
         backoffStrategy = ExponentialBackoff(
             initialDelay = 200.milliseconds,
             maxDelay = 5.seconds,
@@ -166,7 +175,7 @@ val policy = resilient {
 ```
 
 ### Fallback
-Return a fallback value when the operation fails.
+Return a fallback value when the operation fails. **Ensure the fallback return type matches the type returned by the block** passed to `execute()`, otherwise a `ClassCastException` may occur at runtime.
 ```kotlin
 import com.santimattius.resilient.fallback.FallbackConfig
 
@@ -210,10 +219,11 @@ setContent { ResilientExample() }
 
 ## Best Practices
 - Start simple: Timeout + Retry. Add Circuit Breaker for flaky dependencies.
+- **shouldRetry:** Do not retry on 4xx client errors (e.g. 400, 404, 409); retry only on transient failures (5xx, network/IO, timeouts). This avoids amplifying bad requests and keeps idempotency expectations clear.
 - Rate limiter for external APIs; Bulkhead for database or threadpool protection.
 - Hedging reduces tail latency but raises load—use selectively.
 - Cache only idempotent reads; set TTL appropriately.
-- Always observe telemetry for visibility and tuning.
+- Always observe telemetry (including CacheHit/CacheMiss, FallbackTriggered) for visibility and tuning.
 
 ## Testing Notes
 - Use kotlinx-coroutines-test for virtual time.

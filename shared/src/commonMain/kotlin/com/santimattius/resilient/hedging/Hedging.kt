@@ -55,9 +55,11 @@ class HedgingConfig {
  * the exception from the first failing attempt is re-thrown.
  *
  * @param config The [HedgingConfig] to configure the behavior of the policy, such as the number of attempts and the delay between them.
+ * @param onHedgingUsed Optional callback invoked when the result comes from a non-primary attempt (attemptIndex > 0); useful for telemetry.
  */
 class DefaultHedgingPolicy(
-    private val config: HedgingConfig
+    private val config: HedgingConfig,
+    private val onHedgingUsed: (Int) -> Unit = {}
 ) : HedgingPolicy {
 
     /**
@@ -121,6 +123,9 @@ class DefaultHedgingPolicy(
 
             if (result.isSuccess) {
                 // Success! Cancel all other attempts and return
+                if (winnerIndex > 0) {
+                    onHedgingUsed(winnerIndex)
+                }
                 activeIndices.forEach { idx ->
                     if (idx != winnerIndex) {
                         deferreds[idx].cancel()
