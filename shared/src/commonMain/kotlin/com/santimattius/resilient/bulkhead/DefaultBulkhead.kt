@@ -28,6 +28,15 @@ class DefaultBulkhead(
     private val config: BulkheadConfig,
 ) : Bulkhead {
 
+    init {
+        require(config.maxConcurrentCalls >= 1) {
+            "maxConcurrentCalls must be >= 1, got ${config.maxConcurrentCalls}"
+        }
+        require(config.maxWaitingCalls >= 0) {
+            "maxWaitingCalls must be >= 0, got ${config.maxWaitingCalls}"
+        }
+    }
+
     private val semaphore = Semaphore(config.maxConcurrentCalls)
     private val mutex = Mutex()
     private var queuedWaiters: Int = 0

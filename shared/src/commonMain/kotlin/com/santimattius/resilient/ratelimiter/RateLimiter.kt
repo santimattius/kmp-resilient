@@ -11,6 +11,13 @@ import kotlin.time.Duration.Companion.seconds
  * will either suspend until permission is granted or throw a [RateLimitExceededException].
  */
 interface RateLimiter {
+    /**
+     * Executes [block] after obtaining a permit from the rate limiter; may suspend or throw if the limit is exceeded.
+     * @param T The return type of the block.
+     * @param block The suspendable operation to run after a permit is acquired.
+     * @return The result of [block].
+     * @throws RateLimitExceededException When the rate limit is exceeded and no permit is obtained (e.g. no timeout configured or wait exceeded timeout).
+     */
     suspend fun <T> execute(block: suspend () -> T): T
 }
 
@@ -26,7 +33,9 @@ interface RateLimiter {
  *   If null (the default), calls will fail immediately with a [RateLimitExceededException] when the limit is reached.
  *   If set, the call will be suspended for up to this duration, waiting for a permit to become available.
  * @property onRateLimited A suspendable lambda function that is executed when a call is rate-limited.
- *   This can be used for logging or other side effects. It is invoked before the call is either rejected or queued.
+ *   This can be used for logging or other side effects. When the policy is built via
+ *   [com.santimattius.resilient.composition.resilient], the builder injects a telemetry callback that runs first
+ *   (emitting [com.santimattius.resilient.telemetry.ResilientEvent.RateLimited]), then [onRateLimited] is invoked.
  */
 class RateLimiterConfig {
     var maxCalls: Int = 100
@@ -35,6 +44,11 @@ class RateLimiterConfig {
     var onRateLimited: suspend () -> Unit = { }
 }
 
+/**
+ * Exception thrown when a call is rejected by the rate limiter because the rate limit has been exceeded.
+ *
+ * @property retryAfter Suggested duration to wait before retrying, or null if not available.
+ */
 class RateLimitExceededException(
     val retryAfter: Duration?
 ) : Exception()

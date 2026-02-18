@@ -664,10 +664,32 @@ class ResilientPolicyTest {
 
     @Test
     fun `given default composition order when fallback is configured then fallback is outermost`() = runTest {
-        // given
+        // given - fallback is outermost; cancellation (e.g. timeout) propagates, normal failures are caught
         val scope = ResilientScope()
         val policy = resilient(scope) {
-            // Using default order
+            timeout {
+                timeout = 10.seconds
+            }
+            retry {
+                maxAttempts = 1
+            }
+            fallback(FallbackConfig { "fallback-value" })
+        }
+
+        // when - block throws a normal exception (not cancellation)
+        val result = policy.execute<String> {
+            throw RuntimeException("fail")
+        }
+
+        // then - Fallback catches non-cancellation and returns fallback value
+        assertEquals("fallback-value", result)
+    }
+
+    @Test
+    fun `given fallback when timeout occurs then TimeoutCancellationException propagates`() = runTest {
+        // Cancellation (including timeout) must propagate; fallback must not swallow it
+        val scope = ResilientScope()
+        val policy = resilient(scope) {
             timeout {
                 timeout = 1.seconds
             }
@@ -677,14 +699,12 @@ class ResilientPolicyTest {
             fallback(FallbackConfig { "fallback-value" })
         }
 
-        // when - timeout should trigger, then retry fails, fallback catches
-        val result = policy.execute<String> {
-            delay(2.seconds) // Exceeds timeout
-            "never-reached"
+        assertFailsWith<TimeoutCancellationException> {
+            policy.execute<String> {
+                delay(2.seconds)
+                "never-reached"
+            }
         }
-
-        // then - Fallback should catch TimeoutCancellationException
-        assertEquals("fallback-value", result)
     }
 
     @Test
