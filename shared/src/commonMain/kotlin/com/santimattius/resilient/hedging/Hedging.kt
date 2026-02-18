@@ -19,14 +19,21 @@ import kotlin.time.Duration.Companion.milliseconds
  * It's particularly useful for operations where tail latency is a concern.
  */
 interface HedgingPolicy {
+    /**
+     * Executes [block] with multiple parallel attempts; returns the first successful result or throws if all fail.
+     * @param T The return type of the block.
+     * @param block The suspendable operation to execute (possibly multiple times in parallel).
+     * @return The result of the first successful execution.
+     * @throws Throwable The first failure if all attempts fail.
+     */
     suspend fun <T> execute(block: suspend () -> T): T
 }
 
 /**
  * Configuration for [HedgingPolicy].
  *
- * - [attempts]: number of parallel attempts to launch
- * - [stagger]: delay between launching each subsequent attempt
+ * @property attempts Number of parallel attempts to launch. Must be >= 1. Defaults to 2.
+ * @property stagger Delay between launching each subsequent attempt (cumulative: attempt i starts after i * stagger). Defaults to 0.
  */
 class HedgingConfig {
     var attempts: Int = 2
