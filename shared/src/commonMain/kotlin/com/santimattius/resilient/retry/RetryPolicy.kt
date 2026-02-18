@@ -10,6 +10,13 @@ package com.santimattius.resilient.retry
  * when a retry should occur.
  */
 interface RetryPolicy {
+    /**
+     * Executes [block] and retries on failure according to the policy configuration.
+     * @param T The return type of the block.
+     * @param block The suspendable operation to execute and optionally retry.
+     * @return The result of [block] when it succeeds.
+     * @throws Throwable The last exception if all attempts fail, or if [block] throws and retry is not applicable.
+     */
     suspend fun <T> execute(block: suspend () -> T): T
 }
 
@@ -37,6 +44,12 @@ class RetryPolicyConfig {
     var onRetry: suspend (attempt: Int, error: Throwable) -> Unit = { _, _ -> }
 }
 
+/**
+ * Strategy for computing the delay before the next retry attempt.
+ */
 sealed interface BackoffStrategy {
+    /**
+     * Suspends for the delay duration appropriate for the given [attempt] (1-based).
+     */
     suspend fun delay(attempt: Int)
 }
