@@ -23,6 +23,12 @@ import kotlin.time.ExperimentalTime
  * store its result in the cache, and then return it.
  */
 interface CachePolicy {
+    /**
+     * Returns a cached result for the configured key if valid and non-expired; otherwise executes [block], caches the result, and returns it.
+     * @param T The return type of the block and cached value.
+     * @param block The suspendable operation to execute on cache miss or expiry.
+     * @return The cached value or the result of [block] (after caching).
+     */
     suspend fun <T> execute(block: suspend () -> T): T
 }
 
@@ -64,11 +70,16 @@ class CacheConfig {
  * requests arrive concurrently.
  *
  * @param config The [CacheConfig] specifying the cache key and time-to-live (TTL).
+ * @param scope Optional [ResilientScope] used to launch the cleanup job when [CacheConfig.cleanupInterval] is set.
+ * @param onCacheHit Optional callback invoked when a cache hit occurs (optional telemetry).
+ * @param onCacheMiss Optional callback invoked when the block is executed due to a cache miss (optional telemetry).
  */
 internal class InMemoryCachePolicy(
     private val config: CacheConfig,
-    scope: ResilientScope? = null
-) : CachePolicy {
+    scope: ResilientScope? = null,
+    private val onCacheHit: (() -> Unit)? = null,
+    private val onCacheMiss: (() -> Unit)? = null
+) : CachePolicy, AutoCloseable {
 
     private data class Entry(val value: Any?, val expiresAt: Long)
 
@@ -97,6 +108,7 @@ internal class InMemoryCachePolicy(
         mutex.withLock {
             store[key]?.let { entry ->
                 if (now < entry.expiresAt) {
+                    onCacheHit?.invoke()
                     return@coroutineScope entry.value as T
                 }
                 store.remove(key)
@@ -107,6 +119,7 @@ internal class InMemoryCachePolicy(
             ongoing.getOrPut(key) {
                 async {
                     try {
+                        onCacheMiss?.invoke()
                         val result = block()
                         val expiresAt = currentTimeMillis() + config.ttl.inWholeMilliseconds
                         mutex.withLock {
@@ -143,7 +156,7 @@ internal class InMemoryCachePolicy(
         }
     }
 
-    fun close() {
+    override fun close() {
         sweeperJob?.cancel()
         sweeperJob = null
     }

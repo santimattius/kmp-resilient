@@ -22,8 +22,13 @@ import kotlinx.coroutines.flow.SharedFlow
  * 9.  **User's Code Block**: The actual suspendable operation to be executed.
  *
  * Telemetry events are emitted throughout the execution, providing insights into the behavior of each strategy.
+ *
+ * **Lifecycle:** This policy implements [AutoCloseable]. Call [close] when the policy is no longer needed to release
+ * internal resources (e.g. cache cleanup job when using [com.santimattius.resilient.cache.CacheConfig.cleanupInterval]).
+ * If you use a [com.santimattius.resilient.composition.ResilientScope], closing that scope cancels its jobs
+ * (including cache cleanup); calling [close] on the policy additionally stops the cache sweeper without closing the scope.
  */
-interface ResilientPolicy {
+interface ResilientPolicy : AutoCloseable {
     /**
      * A stream of telemetry events emitted by the policy's resilience strategies during execution.
      *

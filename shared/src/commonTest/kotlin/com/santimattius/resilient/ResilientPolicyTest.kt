@@ -16,6 +16,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -232,10 +233,13 @@ class ResilientPolicyTest {
                 }
             }
 
-            // then - should emit OperationFailure
-            val event = awaitItem()
-            assertIs<ResilientEvent.OperationFailure>(event)
-            assertIs<TimeoutCancellationException>(event.error)
+            // then - should emit TimeoutTriggered then OperationFailure
+            val timeoutEvent = awaitItem()
+            assertIs<ResilientEvent.TimeoutTriggered>(timeoutEvent)
+            assertEquals(50.milliseconds, timeoutEvent.timeout)
+            val failureEvent = awaitItem()
+            assertIs<ResilientEvent.OperationFailure>(failureEvent)
+            assertIs<TimeoutCancellationException>(failureEvent.error)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -463,6 +467,32 @@ class ResilientPolicyTest {
     }
 
     @Test
+    fun `given cache policy when events are collected then emits CacheMiss then CacheHit`() = runTest {
+        val scope = ResilientScope()
+        val policy = resilient(scope) {
+            cache {
+                key = "telemetry-key"
+                ttl = 1.seconds
+            }
+        }
+        policy.events.test {
+            policy.execute { "v1" }
+            val miss = awaitItem()
+            assertIs<ResilientEvent.CacheMiss>(miss)
+            assertEquals("telemetry-key", miss.key)
+            val success = awaitItem()
+            assertIs<ResilientEvent.OperationSuccess>(success)
+            policy.execute { "v2" } // hit
+            val hit = awaitItem()
+            assertIs<ResilientEvent.CacheHit>(hit)
+            assertEquals("telemetry-key", hit.key)
+            val success2 = awaitItem()
+            assertIs<ResilientEvent.OperationSuccess>(success2)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `given concurrent executions when policies are applied then all complete successfully`() = runTest {
         // given
         val scope = ResilientScope()
@@ -664,10 +694,32 @@ class ResilientPolicyTest {
 
     @Test
     fun `given default composition order when fallback is configured then fallback is outermost`() = runTest {
-        // given
+        // given - fallback is outermost; cancellation (e.g. timeout) propagates, normal failures are caught
         val scope = ResilientScope()
         val policy = resilient(scope) {
-            // Using default order
+            timeout {
+                timeout = 10.seconds
+            }
+            retry {
+                maxAttempts = 1
+            }
+            fallback(FallbackConfig { "fallback-value" })
+        }
+
+        // when - block throws a normal exception (not cancellation)
+        val result = policy.execute<String> {
+            throw RuntimeException("fail")
+        }
+
+        // then - Fallback catches non-cancellation and returns fallback value
+        assertEquals("fallback-value", result)
+    }
+
+    @Test
+    fun `given fallback when timeout occurs then TimeoutCancellationException propagates`() = runTest {
+        // Cancellation (including timeout) must propagate; fallback must not swallow it
+        val scope = ResilientScope()
+        val policy = resilient(scope) {
             timeout {
                 timeout = 1.seconds
             }
@@ -677,14 +729,12 @@ class ResilientPolicyTest {
             fallback(FallbackConfig { "fallback-value" })
         }
 
-        // when - timeout should trigger, then retry fails, fallback catches
-        val result = policy.execute<String> {
-            delay(2.seconds) // Exceeds timeout
-            "never-reached"
+        assertFailsWith<TimeoutCancellationException> {
+            policy.execute<String> {
+                delay(2.seconds)
+                "never-reached"
+            }
         }
-
-        // then - Fallback should catch TimeoutCancellationException
-        assertEquals("fallback-value", result)
     }
 
     @Test

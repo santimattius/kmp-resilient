@@ -3,6 +3,7 @@ package com.santimattius.resilient.composition
 import com.santimattius.resilient.ResilientPolicy
 import com.santimattius.resilient.annotations.ResilientExperimentalApi
 import com.santimattius.resilient.bulkhead.BulkheadConfig
+import com.santimattius.resilient.bulkhead.BulkheadFullException
 import com.santimattius.resilient.bulkhead.DefaultBulkhead
 import com.santimattius.resilient.cache.CacheConfig
 import com.santimattius.resilient.cache.InMemoryCachePolicy
@@ -24,7 +25,10 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlin.time.TimeSource
 
-
+/**
+ * Type alias for a suspendable block that produces a value of type [T].
+ * Used internally when composing resilience policy wrappers.
+ */
 typealias Execute<T> = suspend () -> T
 
 /**
@@ -74,34 +78,66 @@ class ResilientBuilder {
     internal var compositionOrder: CompositionOrder = CompositionOrder.DEFAULT
     internal var compositionOrderExplicitlySet: Boolean = false
 
+    /**
+     * Configures a retry policy. The block will be retried on failure according to [RetryPolicyConfig].
+     * @param config Lambda to configure [RetryPolicyConfig] (e.g. maxAttempts, backoffStrategy).
+     */
     fun retry(config: RetryPolicyConfig.() -> Unit) {
         retryConfig = (retryConfig ?: RetryPolicyConfig()).apply(config)
     }
 
+    /**
+     * Configures a circuit breaker. Execution is rejected when the circuit is open.
+     * @param config Lambda to configure [CircuitBreakerConfig] (e.g. failureThreshold, timeout).
+     */
     fun circuitBreaker(config: CircuitBreakerConfig.() -> Unit) {
         circuitBreakerConfig = (circuitBreakerConfig ?: CircuitBreakerConfig()).apply(config)
     }
 
+    /**
+     * Configures a rate limiter. Execution may be delayed or rejected when the rate limit is exceeded.
+     * @param config Lambda to configure [RateLimiterConfig] (e.g. maxCalls, period).
+     */
     fun rateLimiter(config: RateLimiterConfig.() -> Unit) {
         rateLimiterConfig = (rateLimiterConfig ?: RateLimiterConfig()).apply(config)
     }
 
+    /**
+     * Configures a bulkhead. Limits the number of concurrent executions and optional waiting queue.
+     * @param config Lambda to configure [BulkheadConfig] (e.g. maxConcurrentCalls, maxWaitingCalls).
+     */
     fun bulkhead(config: BulkheadConfig.() -> Unit) {
         bulkheadConfig = (bulkheadConfig ?: BulkheadConfig()).apply(config)
     }
 
+    /**
+     * Configures a timeout policy. Execution is cancelled if it exceeds the configured duration.
+     * @param config Lambda to configure [TimeoutConfig] (e.g. timeout, onTimeout).
+     */
     fun timeout(config: TimeoutConfig.() -> Unit) {
         timeoutConfig = (timeoutConfig ?: TimeoutConfig()).apply(config)
     }
 
+    /**
+     * Configures an in-memory cache. Results are cached by key and TTL; cache is checked before executing the block.
+     * @param config Lambda to configure [CacheConfig] (e.g. key, ttl, cleanupInterval).
+     */
     fun cache(config: CacheConfig.() -> Unit) {
         cacheConfig = (cacheConfig ?: CacheConfig()).apply(config)
     }
 
+    /**
+     * Configures a fallback policy. When the block fails (excluding cancellation), [FallbackConfig.onFallback] is invoked.
+     * @param config The fallback configuration providing the alternative result or logic.
+     */
     fun fallback(config: FallbackConfig<Any?>) {
         fallbackConfig = config
     }
 
+    /**
+     * Configures a hedging policy. Multiple parallel attempts are launched; the first success is returned.
+     * @param config Lambda to configure [HedgingConfig] (e.g. attempts, stagger).
+     */
     fun hedging(config: HedgingConfig.() -> Unit) {
         hedgingConfig = (hedgingConfig ?: HedgingConfig()).apply(config)
     }
@@ -113,9 +149,9 @@ class ResilientBuilder {
      * **Important**: Fallback is always positioned outermost and cannot be included in the order.
      * It will be automatically prepended to ensure it catches all failures from other policies.
      *
-     * @param order The list of orderable policy types in the desired composition order.
-     *              Must contain all orderable policy types exactly once.
-     * @throws IllegalArgumentException if the order doesn't contain all orderable policy types or contains duplicates.
+     * @param order The list of orderable policy types in the desired composition order (outermost to innermost).
+     *              Optional: may be empty or a subset. Types in the list are ordered as given; any type not in the list
+     *              is appended in the default order. Duplicates are removed.
      *
      * Example:
      * ```kotlin
@@ -139,9 +175,6 @@ class ResilientBuilder {
 
     @ResilientExperimentalApi
     fun compositionOrder(order: List<OrderablePolicyType>) {
-        require(order.isNotEmpty()){
-            "Composition order cannot be empty"
-        }
         compositionOrder = CompositionOrder(order)
         compositionOrderExplicitlySet = true
     }
@@ -184,28 +217,51 @@ fun resilient(
     val builder = ResilientBuilder().apply(block)
     val events = MutableSharedFlow<ResilientEvent>(extraBufferCapacity = 10)
 
-    val cache = builder.cacheConfig?.let { InMemoryCachePolicy(it, resilientScope) }
-    val timeout = builder.timeoutConfig?.let { DefaultTimeoutPolicy(it) }
+    val cache = builder.cacheConfig?.let { cfg ->
+        InMemoryCachePolicy(
+            config = cfg,
+            scope = resilientScope,
+            onCacheHit = { events.tryEmit(ResilientEvent.CacheHit(cfg.key)) },
+            onCacheMiss = { events.tryEmit(ResilientEvent.CacheMiss(cfg.key)) }
+        )
+    }
+    val timeoutPolicy = builder.timeoutConfig?.let { cfg ->
+        val copy = TimeoutConfig().apply {
+            timeout = cfg.timeout
+            onTimeout = {
+                events.emit(ResilientEvent.TimeoutTriggered(cfg.timeout))
+                cfg.onTimeout()
+            }
+        }
+        DefaultTimeoutPolicy(copy)
+    }
 
     val retryCfg = builder.retryConfig
-    val retry = retryCfg?.let {
-        // wire onRetry to emit event
-        val original = it.onRetry
-        it.onRetry = { attempt, error ->
-            events.emit(ResilientEvent.RetryAttempt(attempt, error))
-            original(attempt, error)
+    val retry = retryCfg?.let { cfg ->
+        // Clone config so the original is not mutated (avoids duplicate callbacks if config is reused)
+        val copy = RetryPolicyConfig().apply {
+            maxAttempts = cfg.maxAttempts
+            backoffStrategy = cfg.backoffStrategy
+            shouldRetry = cfg.shouldRetry
+            onRetry = { attempt, error ->
+                events.emit(ResilientEvent.RetryAttempt(attempt, error))
+                cfg.onRetry(attempt, error)
+            }
         }
-        DefaultRetryPolicy(it)
+        DefaultRetryPolicy(copy)
     }
 
     val circuitBreaker = builder.circuitBreakerConfig?.let { cfg ->
-        val original = cfg.onStateChange
-        cfg.onStateChange = { state ->
-            original(state)
-            // emitting only state-to-state transitions requires knowledge of previous; handled inside impl
+        // Clone config so the original is not mutated (avoids duplicate callbacks if config is reused)
+        val copy = CircuitBreakerConfig().apply {
+            failureThreshold = cfg.failureThreshold
+            successThreshold = cfg.successThreshold
+            timeout = cfg.timeout
+            halfOpenMaxCalls = cfg.halfOpenMaxCalls
+            shouldRecordFailure = cfg.shouldRecordFailure
+            onStateChange = { state -> cfg.onStateChange(state) }
         }
-        DefaultCircuitBreaker(cfg) { new, old ->
-            // best effort: we do not have previous here; emit change to new with placeholder
+        DefaultCircuitBreaker(copy) { new, old ->
             events.tryEmit(ResilientEvent.CircuitStateChanged(old, new))
         }
     }
@@ -220,8 +276,16 @@ fun resilient(
     }
 
     val bulkhead = builder.bulkheadConfig?.let { DefaultBulkhead(it) }
-    val hedging = builder.hedgingConfig?.let { DefaultHedgingPolicy(it) }
-    val fallback = builder.fallbackConfig?.let { FallbackPolicy(it) }
+    val hedging = builder.hedgingConfig?.let { cfg ->
+        DefaultHedgingPolicy(cfg) { attemptIndex ->
+            events.tryEmit(ResilientEvent.HedgingUsed(attemptIndex))
+        }
+    }
+    val fallback = builder.fallbackConfig?.let { cfg ->
+        FallbackPolicy(cfg) { t ->
+            events.tryEmit(ResilientEvent.FallbackTriggered(t))
+        }
+    }
 
     return object : ResilientPolicy {
         override val events: SharedFlow<ResilientEvent>
@@ -232,7 +296,7 @@ fun resilient(
             return try {
                 val composed = compose(
                     cache = cache,
-                    timeout = timeout,
+                    timeout = timeoutPolicy,
                     retry = retry,
                     circuitBreaker = circuitBreaker,
                     rateLimiter = rateLimiter,
@@ -246,9 +310,16 @@ fun resilient(
                 events.emit(ResilientEvent.OperationSuccess(mark.elapsedNow()))
                 result
             } catch (t: Throwable) {
+                if (t is BulkheadFullException) {
+                    events.tryEmit(ResilientEvent.BulkheadRejected("Bulkhead full: max concurrent and queue capacity reached"))
+                }
                 events.emit(ResilientEvent.OperationFailure(t, mark.elapsedNow()))
                 throw t
             }
+        }
+
+        override fun close() {
+            cache?.close()
         }
 
         private fun <T> compose(
@@ -276,7 +347,7 @@ fun resilient(
                             { next: Execute<T> -> suspend { policy.execute { next() } } }
                         }
 
-                        PolicyType.TIMEOUT -> timeout?.let { policy ->
+                        PolicyType.TIMEOUT -> timeoutPolicy?.let { policy ->
                             { next: Execute<T> -> suspend { policy.execute { next() } } }
                         }
 

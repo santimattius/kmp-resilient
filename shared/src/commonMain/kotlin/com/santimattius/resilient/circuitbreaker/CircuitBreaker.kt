@@ -27,7 +27,18 @@ import kotlin.time.Duration.Companion.seconds
  * @see CircuitBreakerOpenException for the exception thrown when the circuit is open.
  */
 interface CircuitBreaker {
+    /**
+     * Executes [block] if the circuit allows it; otherwise throws [CircuitBreakerOpenException].
+     * @param T The return type of the block.
+     * @param block The suspendable operation to execute.
+     * @return The result of [block] when the circuit is closed or half-open and the call is allowed.
+     * @throws CircuitBreakerOpenException When the circuit is open or half-open and the call limit is reached.
+     */
     suspend fun <T> execute(block: suspend () -> T): T
+
+    /**
+     * The current state of the circuit: [CircuitState.CLOSED], [CircuitState.OPEN], or [CircuitState.HALF_OPEN].
+     */
     val state: StateFlow<CircuitState>
 }
 
@@ -77,6 +88,9 @@ enum class CircuitState {
  * Additional calls beyond this limit will be rejected.
  * Defaults to `3`.
  *
+ * @property onStateChange Invoked when the circuit state changes. Receives the **new** state only.
+ * When the policy is built via [com.santimattius.resilient.composition.resilient], telemetry events
+ * ([ResilientEvent.CircuitStateChanged]) receive both the previous and new state.
  */
 class CircuitBreakerConfig {
     var failureThreshold: Int = 5
