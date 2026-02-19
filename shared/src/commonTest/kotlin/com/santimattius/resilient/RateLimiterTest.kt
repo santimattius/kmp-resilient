@@ -398,14 +398,17 @@ class RateLimiterTest {
 
     @Test
     fun `given rate limiter when concurrent calls with timeout then select handles race correctly`() = runTest {
-        // given
+        // given - use TestTimeSource so refill time is deterministic (not real time)
+        val testTimeSource = TestTimeSource()
+        testTimeSource.setTime(0)
         val cfg = RateLimiterConfig().apply {
             maxCalls = 1
             period = 50.milliseconds
             timeoutWhenLimited = 30.milliseconds
         }
-        val rateLimiter = DefaultRateLimiter(cfg)
+        val rateLimiter = DefaultRateLimiter(cfg, timeSource = testTimeSource)
         rateLimiter.execute { "first" }
+        // Time still 0: token consumed, next refill in 50ms; timeout is 30ms so both waiters will timeout
 
         // when - start multiple concurrent calls
         val deferred1 = async {
@@ -423,7 +426,7 @@ class RateLimiterTest {
             }
         }
         
-        // Advance time - timeout should win (30ms < 50ms)
+        // Advance virtual time - timeout wins (30ms < 50ms refill)
         advanceTimeBy(30.milliseconds.inWholeMilliseconds)
         advanceUntilIdle()
 
