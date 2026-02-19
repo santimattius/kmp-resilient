@@ -28,6 +28,8 @@ class ResilientViewModel : ViewModel() {
         cache {
             key = "demo-call"
             ttl = 30.seconds
+            cleanupInterval = 60.seconds
+            cleanupBatch = 50
         }
         timeout { timeout = 2.seconds }
         retry {
@@ -54,7 +56,19 @@ class ResilientViewModel : ViewModel() {
             coroutineScope {
                 val collector = launch {
                     policy.events.collect { event ->
-                        val label = formatEvent(event)
+                        val label = when (event) {
+                            is ResilientEvent.CacheHit -> "Cache hit: ${event.key}"
+                            is ResilientEvent.CacheMiss -> "Cache miss: ${event.key}"
+                            is ResilientEvent.RetryAttempt -> "Retry #${event.attempt}: ${event.error.message}"
+                            is ResilientEvent.CircuitStateChanged -> "Circuit ${event.from} → ${event.to}"
+                            is ResilientEvent.OperationSuccess -> "Success in ${event.duration}"
+                            is ResilientEvent.OperationFailure -> "Failed: ${event.error.message}"
+                            is ResilientEvent.TimeoutTriggered -> "Timeout: ${event.timeout}"
+                            is ResilientEvent.FallbackTriggered -> "Fallback: ${event.error.message}"
+                            is ResilientEvent.HedgingUsed -> "Hedging attempt ${event.attemptIndex + 1}"
+                            is ResilientEvent.RateLimited -> "Rate limited: wait ${event.waitTime}"
+                            is ResilientEvent.BulkheadRejected -> "Bulkhead: ${event.reason}"
+                        }
                         val currentEvents = _uiState.value.events
                         val updatedEvents = (currentEvents + label).takeLast(12)
                         _uiState.value = _uiState.value.copy(events = updatedEvents)
@@ -84,20 +98,6 @@ class ResilientViewModel : ViewModel() {
                 }
             }
         }
-    }
-
-    private fun formatEvent(event: ResilientEvent): String = when (event) {
-        is ResilientEvent.CacheHit -> "CacheHit(key=${event.key})"
-        is ResilientEvent.CacheMiss -> "CacheMiss(key=${event.key})"
-        is ResilientEvent.TimeoutTriggered -> "TimeoutTriggered(${event.timeout})"
-        is ResilientEvent.FallbackTriggered -> "FallbackTriggered: ${event.error.message}"
-        is ResilientEvent.HedgingUsed -> "HedgingUsed(attempt ${event.attemptIndex + 1})"
-        is ResilientEvent.RetryAttempt -> "RetryAttempt(#${event.attempt}: ${event.error.message})"
-        is ResilientEvent.CircuitStateChanged -> "CircuitStateChanged(${event.from} → ${event.to})"
-        is ResilientEvent.RateLimited -> "RateLimited(wait=${event.waitTime})"
-        is ResilientEvent.BulkheadRejected -> "BulkheadRejected(${event.reason})"
-        is ResilientEvent.OperationSuccess -> "OperationSuccess(${event.duration})"
-        is ResilientEvent.OperationFailure -> "OperationFailure(${event.error.message}, ${event.duration})"
     }
 
     override fun onCleared() {
