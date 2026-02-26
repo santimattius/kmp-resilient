@@ -3,6 +3,7 @@ package com.santimattius.resilient
 import app.cash.turbine.test
 import com.santimattius.resilient.annotations.ResilientExperimentalApi
 import com.santimattius.resilient.circuitbreaker.CircuitBreakerOpenException
+import com.santimattius.resilient.circuitbreaker.CircuitState
 import com.santimattius.resilient.composition.OrderablePolicyType
 import com.santimattius.resilient.composition.ResilientScope
 import com.santimattius.resilient.composition.resilient
@@ -490,6 +491,47 @@ class ResilientPolicyTest {
             assertIs<ResilientEvent.OperationSuccess>(success2)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `given policy with circuit breaker and bulkhead when getHealthSnapshot then returns non-null snapshots`() = runTest {
+        val scope = ResilientScope(testDispatcher)
+        val policy = resilient(scope) {
+            circuitBreaker {
+                failureThreshold = 5
+                successThreshold = 2
+                timeout = 10.seconds
+                halfOpenMaxCalls = 1
+            }
+            bulkhead {
+                maxConcurrentCalls = 4
+                maxWaitingCalls = 8
+            }
+        }
+
+        val snap = policy.getHealthSnapshot()
+        val cb = requireNotNull(snap.circuitBreaker)
+        assertEquals(CircuitState.CLOSED, cb.state)
+        assertEquals(0, cb.failureCount)
+        assertEquals(0, cb.successCount)
+
+        val bh = requireNotNull(snap.bulkhead)
+        assertEquals(0, bh.activeConcurrentCalls)
+        assertEquals(0, bh.waitingCalls)
+        assertEquals(4, bh.maxConcurrentCalls)
+        assertEquals(8, bh.maxWaitingCalls)
+    }
+
+    @Test
+    fun `given policy without circuit or bulkhead when getHealthSnapshot then returns null snapshots`() = runTest {
+        val scope = ResilientScope(testDispatcher)
+        val policy = resilient(scope) {
+            timeout { timeout = 1.seconds }
+        }
+
+        val snap = policy.getHealthSnapshot()
+        assertEquals(null, snap.circuitBreaker)
+        assertEquals(null, snap.bulkhead)
     }
 
     @Test

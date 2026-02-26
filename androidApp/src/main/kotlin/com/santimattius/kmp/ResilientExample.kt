@@ -5,8 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -21,6 +23,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.santimattius.resilient.circuitbreaker.CircuitState
 
 @Composable
 fun ResilientExample(
@@ -85,6 +88,28 @@ fun ResilientExample(
                     enabled = !uiState.isLoading,
                 ) {
                     Text("Invalidate all (prefix)")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Health / Readiness (getHealthSnapshot)", style = MaterialTheme.typography.titleSmall)
+            Button(
+                onClick = { viewModel.refreshHealthSnapshot() },
+                enabled = !uiState.isLoading,
+            ) {
+                Text("Refresh health")
+            }
+            uiState.healthSnapshot?.let { snap ->
+                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    snap.circuitBreaker?.let { cb ->
+                        Text("Circuit: ${cb.state} (failures=${cb.failureCount}, successes=${cb.successCount})")
+                        if (cb.state == CircuitState.OPEN) {
+                            Text("Unhealthy: circuit open", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    snap.bulkhead?.let { bh ->
+                        Text("Bulkhead: ${bh.activeConcurrentCalls}/${bh.maxConcurrentCalls} active, ${bh.waitingCalls}/${bh.maxWaitingCalls} waiting")
+                    }
                 }
             }
 

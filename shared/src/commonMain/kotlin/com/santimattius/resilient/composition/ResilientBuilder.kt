@@ -18,6 +18,7 @@ import com.santimattius.resilient.ratelimiter.DefaultRateLimiter
 import com.santimattius.resilient.ratelimiter.RateLimiterConfig
 import com.santimattius.resilient.retry.DefaultRetryPolicy
 import com.santimattius.resilient.retry.RetryPolicyConfig
+import com.santimattius.resilient.PolicyHealthSnapshot
 import com.santimattius.resilient.telemetry.ResilientEvent
 import com.santimattius.resilient.timeout.DefaultTimeoutPolicy
 import com.santimattius.resilient.timeout.TimeoutConfig
@@ -295,6 +296,11 @@ fun resilient(
 
         override val cacheHandle: CacheHandle?
             get() = cache
+
+        override fun getHealthSnapshot(): PolicyHealthSnapshot = PolicyHealthSnapshot(
+            circuitBreaker = circuitBreaker?.snapshot(),
+            bulkhead = bulkhead?.snapshot()
+        )
 
         override suspend fun <T> execute(block: Execute<T>): T {
             val mark = TimeSource.Monotonic.markNow()

@@ -72,6 +72,12 @@ class DefaultCircuitBreaker(
     @Volatile
     private var successCount: Int = 0
 
+    override fun snapshot(): CircuitBreakerSnapshot = CircuitBreakerSnapshot(
+        state = _state.value,
+        failureCount = failureCount,
+        successCount = successCount
+    )
+
     @Volatile
     private var openUntilMs: Long = 0L
 

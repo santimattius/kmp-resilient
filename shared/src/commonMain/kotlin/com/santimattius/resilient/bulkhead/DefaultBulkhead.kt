@@ -1,5 +1,6 @@
 package com.santimattius.resilient.bulkhead
 
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
@@ -39,14 +40,26 @@ class DefaultBulkhead(
 
     private val semaphore = Semaphore(config.maxConcurrentCalls)
     private val mutex = Mutex()
+    @Volatile
     private var queuedWaiters: Int = 0
+    @Volatile
+    private var activeConcurrentCalls: Int = 0
+
+    override fun snapshot(): BulkheadSnapshot = BulkheadSnapshot(
+        activeConcurrentCalls = activeConcurrentCalls,
+        waitingCalls = queuedWaiters,
+        maxConcurrentCalls = config.maxConcurrentCalls,
+        maxWaitingCalls = config.maxWaitingCalls
+    )
 
     override suspend fun <T> execute(block: suspend () -> T): T {
         val acquired = tryAcquirePermit()
         if (!acquired) throw BulkheadFullException()
+        activeConcurrentCalls++
         try {
             return block()
         } finally {
+            activeConcurrentCalls--
             semaphore.release()
         }
     }
