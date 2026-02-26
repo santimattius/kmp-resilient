@@ -1,7 +1,9 @@
 package com.santimattius.resilient.retry
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import kotlin.math.min
 import kotlin.random.Random
 import kotlin.time.Duration
@@ -35,11 +37,16 @@ class DefaultRetryPolicy(
     override suspend fun <T> execute(block: suspend () -> T): T {
         var lastError: Throwable? = null
         var attempt = 0
+        val timeout = config.perAttemptTimeout
         while (attempt < config.maxAttempts) {
             try {
-                return block()
+                return if (timeout != null && timeout.isPositive()) {
+                    withTimeout(timeout.inWholeMilliseconds) { block() }
+                } else {
+                    block()
+                }
             } catch (e: Throwable) {
-                if (e is CancellationException) throw e
+                if (e is CancellationException && e !is TimeoutCancellationException) throw e
                 if (!config.shouldRetry(e)) throw e
                 lastError = e
                 attempt++

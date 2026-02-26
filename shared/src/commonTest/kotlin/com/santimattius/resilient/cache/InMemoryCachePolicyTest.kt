@@ -192,4 +192,98 @@ class InMemoryCachePolicyTest {
             assertEquals("result", it)
         }
     }
+
+    @Test
+    fun `given keyProvider when two different keys then two executions and distinct values`() = runTest {
+        var callCount = 0
+        val givenConfig = CacheConfig().apply {
+            keyProvider = {
+                callCount++
+                if (callCount == 1) "key-a" else "key-b"
+            }
+            ttl = 10.seconds
+        }
+        val policy = InMemoryCachePolicy(givenConfig)
+        var executions = 0
+
+        val a = policy.execute { executions++; "val-a" }
+        val b = policy.execute { executions++; "val-b" }
+
+        assertEquals("val-a", a)
+        assertEquals("val-b", b)
+        assertEquals(2, executions)
+        assertEquals(2, callCount)
+    }
+
+    @Test
+    fun `given keyProvider when same key twice then one execution and cached return`() = runTest {
+        val givenConfig = CacheConfig().apply {
+            keyProvider = { "fixed-key" }
+            ttl = 10.seconds
+        }
+        val policy = InMemoryCachePolicy(givenConfig)
+        var executions = 0
+
+        val first = policy.execute { executions++; "value-1" }
+        val second = policy.execute { executions++; "value-2" }
+
+        assertEquals("value-1", first)
+        assertEquals("value-1", second)
+        assertEquals(1, executions)
+    }
+
+    @Test
+    fun `given cached value when invalidate then next execute recomputes`() = runTest {
+        val givenConfig = CacheConfig().apply {
+            key = "inv-key"
+            ttl = 10.seconds
+        }
+        val policy = InMemoryCachePolicy(givenConfig)
+        val handle = policy as com.santimattius.resilient.cache.CacheHandle
+        var executions = 0
+
+        val first = policy.execute {
+            executions++
+            "first"
+        }
+        handle.invalidate("inv-key")
+        val second = policy.execute {
+            executions++
+            "second"
+        }
+
+        assertEquals("first", first)
+        assertEquals("second", second)
+        assertEquals(2, executions)
+    }
+
+    @Test
+    fun `given multiple keys when invalidatePrefix then only matching entries removed`() = runTest {
+        val givenConfig = CacheConfig().apply {
+            key = "prefix:ignored"
+            ttl = 10.seconds
+        }
+        val policy = InMemoryCachePolicy(givenConfig)
+        val handle = policy as com.santimattius.resilient.cache.CacheHandle
+        policy.execute { "v1" }
+        givenConfig.key = "prefix:a"
+        policy.execute { "v2" }
+        givenConfig.key = "other:x"
+        policy.execute { "v3" }
+
+        handle.invalidatePrefix("prefix:")
+
+        givenConfig.key = "prefix:ignored"
+        var runs = 0
+        val afterInv1 = policy.execute { runs++; "new1" }
+        givenConfig.key = "prefix:a"
+        val afterInv2 = policy.execute { runs++; "new2" }
+        givenConfig.key = "other:x"
+        val afterInv3 = policy.execute { runs++; "x" }
+
+        assertEquals("new1", afterInv1)
+        assertEquals("new2", afterInv2)
+        assertEquals("v3", afterInv3)
+        assertEquals(2, runs)
+    }
 }
