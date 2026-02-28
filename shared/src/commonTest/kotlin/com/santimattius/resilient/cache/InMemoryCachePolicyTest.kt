@@ -12,6 +12,9 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.ZERO
 import kotlin.time.Duration.Companion.seconds
@@ -286,4 +289,117 @@ class InMemoryCachePolicyTest {
         assertEquals("v3", afterInv3)
         assertEquals(2, runs)
     }
+
+    // --- Behavioral tests that validate the refactored execute() ---
+
+    @Test
+    fun `given cold cache when many concurrent executes then block is executed exactly once`() =
+        runTest {
+            // Validates thundering herd protection: concurrent cache misses must dedup via
+            // `ongoing` and invoke block() only once, returning the same result to all callers.
+            val givenConfig = CacheConfig().apply {
+                key = "thundering-herd-key"
+                ttl = 10.seconds
+            }
+            val policy = InMemoryCachePolicy(givenConfig)
+            var executions = 0
+            val gate = CompletableDeferred<Unit>()
+
+            // All 10 coroutines enter execute() and suspend at gate.await() inside the block.
+            // They must all attach to the same Deferred rather than each creating a new one.
+            val jobs = (1..10).map {
+                async {
+                    policy.execute {
+                        gate.await()
+                        executions++
+                        "result"
+                    }
+                }
+            }
+
+            gate.complete(Unit)
+            val allResults = jobs.awaitAll()
+
+            assertEquals(1, executions)
+            allResults.forEach { assertEquals("result", it) }
+        }
+
+    @Test
+    fun `given cold cache when concurrent executes and block throws then all callers receive error and ongoing is cleared`() =
+        runTest {
+            // Validates that on failure: (1) every concurrent caller receives the exception,
+            // (2) ongoing is cleaned up so a subsequent call can retry successfully.
+            val givenConfig = CacheConfig().apply {
+                key = "concurrent-error-key"
+                ttl = 10.seconds
+            }
+            val policy = InMemoryCachePolicy(givenConfig)
+            var executions = 0
+            val gate = CompletableDeferred<Unit>()
+
+            val jobs = (1..5).map {
+                async {
+                    runCatching {
+                        policy.execute {
+                            gate.await()
+                            executions++
+                            throw IllegalStateException("boom")
+                        }
+                    }
+                }
+            }
+
+            gate.complete(Unit)
+            val results = jobs.awaitAll()
+
+            // All callers must have received the failure — block ran exactly once
+            assertEquals(1, executions)
+            results.forEach { assertTrue(it.isFailure) }
+
+            // ongoing must be cleared: the next call must re-execute block() successfully
+            val recovery = policy.execute {
+                executions++
+                "recovered"
+            }
+            assertEquals("recovered", recovery)
+            assertEquals(2, executions)
+        }
+
+    @Test
+    fun `given onCacheMiss callback when cache miss then callback is invoked with the resolved key`() =
+        runTest {
+            var missedKey: String? = null
+            val givenConfig = CacheConfig().apply {
+                key = "miss-key"
+                ttl = 10.seconds
+            }
+            val policy = InMemoryCachePolicy(
+                config = givenConfig,
+                onCacheMiss = { missedKey = it }
+            )
+
+            policy.execute { "value" }
+
+            assertEquals("miss-key", missedKey)
+        }
+
+    @Test
+    fun `given onCacheHit callback when cache is warm then callback is invoked with the resolved key`() =
+        runTest {
+            var hitKey: String? = null
+            val givenConfig = CacheConfig().apply {
+                key = "hit-key"
+                ttl = 10.seconds
+            }
+            val policy = InMemoryCachePolicy(
+                config = givenConfig,
+                onCacheHit = { hitKey = it }
+            )
+
+            policy.execute { "value" } // populate cache — no hit yet
+            assertNull(hitKey)
+
+            policy.execute { "value" } // warm hit
+            assertEquals("hit-key", hitKey)
+        }
 }
