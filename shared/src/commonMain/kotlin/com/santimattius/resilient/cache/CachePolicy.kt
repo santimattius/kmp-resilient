@@ -140,9 +140,13 @@ internal class InMemoryCachePolicy(
     @Suppress("UNCHECKED_CAST")
     override suspend fun <T> execute(block: suspend () -> T): T = coroutineScope {
         val key = config.keyProvider?.invoke() ?: config.key
-        val now = currentTimeMillis()
 
-        mutex.withLock {
+        // Single atomic lock: cache check + ongoing dedup.
+        // Merging both operations closes the race condition window where a completed
+        // Deferred could be removed from `ongoing` before a new caller entered the
+        // second lock, causing block() to be called again despite a cached result.
+        val deferred: Deferred<Any?> = mutex.withLock {
+            val now = currentTimeMillis()
             store[key]?.let { entry ->
                 if (now < entry.expiresAt) {
                     onCacheHit?.invoke(key)
@@ -150,29 +154,28 @@ internal class InMemoryCachePolicy(
                 }
                 store.remove(key)
             }
-        }
 
-        val deferred: Deferred<Any?> = mutex.withLock {
             ongoing.getOrPut(key) {
                 async {
-                    try {
-                        onCacheMiss?.invoke(key)
-                        val result = block()
-                        val expiresAt = currentTimeMillis() + config.ttl.inWholeMilliseconds
-                        mutex.withLock {
-                            store[key] = Entry(result, expiresAt)
-                        }
-                        result
-                    } finally {
-                        mutex.withLock {
-                            ongoing.remove(key)
-                        }
-                    }
+                    onCacheMiss?.invoke(key)
+                    block()
                 }
             }
         }
 
-        deferred.await() as T
+        try {
+            val result = deferred.await() as T
+            mutex.withLock {
+                if (store[key] == null) {
+                    store[key] = Entry(result, currentTimeMillis() + config.ttl.inWholeMilliseconds)
+                }
+                ongoing.remove(key)
+            }
+            result
+        } catch (e: Throwable) {
+            mutex.withLock { ongoing.remove(key) }
+            throw e
+        }
     }
 
     @OptIn(ExperimentalTime::class)

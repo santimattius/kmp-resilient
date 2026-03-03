@@ -197,6 +197,7 @@ snapshot.bulkhead?.let { bh ->
     // bh.activeConcurrentCalls, bh.waitingCalls, bh.maxConcurrentCalls, bh.maxWaitingCalls
 }
 ```
+The in-memory implementation is one possible `CachePolicy`; custom backends (e.g. persistent storage or Redis) can implement the same interface.
 
 ### Fallback
 Return a fallback value when the operation fails. **Ensure the fallback return type matches the type returned by the block** passed to `execute()`, otherwise a `ClassCastException` may occur at runtime.
