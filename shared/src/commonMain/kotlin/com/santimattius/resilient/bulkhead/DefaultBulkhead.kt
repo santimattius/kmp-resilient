@@ -1,11 +1,13 @@
 package com.santimattius.resilient.bulkhead
 
 import kotlin.concurrent.Volatile
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
 /**
@@ -55,12 +57,14 @@ class DefaultBulkhead(
     override suspend fun <T> execute(block: suspend () -> T): T {
         val acquired = tryAcquirePermit()
         if (!acquired) throw BulkheadFullException()
-        activeConcurrentCalls++
         try {
+            mutex.withLock { activeConcurrentCalls++ }
             return block()
         } finally {
-            activeConcurrentCalls--
-            semaphore.release()
+            withContext(NonCancellable) {
+                mutex.withLock { activeConcurrentCalls-- }
+                semaphore.release()
+            }
         }
     }
 
