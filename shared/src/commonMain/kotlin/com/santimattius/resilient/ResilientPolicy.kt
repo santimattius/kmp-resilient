@@ -1,5 +1,6 @@
 package com.santimattius.resilient
 
+import com.santimattius.resilient.cache.CacheHandle
 import com.santimattius.resilient.telemetry.ResilientEvent
 import kotlinx.coroutines.flow.SharedFlow
 
@@ -38,6 +39,16 @@ interface ResilientPolicy : AutoCloseable {
      * the health and performance of the decorated operations.
      */
     val events: SharedFlow<ResilientEvent>
+
+    /**
+     * Optional handle for cache invalidation when the policy was built with cache enabled.
+     *
+     * Use [CacheHandle.invalidate] to remove a single entry by key, or [CacheHandle.invalidatePrefix]
+     * to remove all entries whose key starts with a given prefix (e.g. `"user:"`).
+     * `null` if no cache was configured.
+     */
+    val cacheHandle: CacheHandle?
+        get() = null
 
     /**
      * Executes the provided suspendable [block] of code under the control of the composed resilience policies.

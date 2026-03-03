@@ -84,7 +84,7 @@ val policy = resilient(scope) {
 ## Features
 
 ### Timeout
-Aborts the operation after a configured duration. `onTimeout` runs only on actual timeouts.
+Aborts the operation after a configured duration. `onTimeout` runs only on actual timeouts. This is a **single** time limit for the block as wrapped by the policy (see [Timeout vs Retry order](#timeout-vs-retry-order)). For a timeout **per retry attempt**, use [Retry](#retry) with `perAttemptTimeout` instead.
 ```kotlin
 val policy = resilient {
     timeout {
@@ -95,7 +95,7 @@ val policy = resilient {
 ```
 
 ### Retry
-Retries failing operations according to a backoff strategy and predicate. Use **shouldRetry** to avoid retrying non-transient errors (e.g. 4xx client errors); retry only on 5xx, network/IO, or timeouts.
+Retries failing operations according to a backoff strategy and predicate. Use **shouldRetry** to avoid retrying non-transient errors (e.g. 4xx client errors); retry only on 5xx, network/IO, or timeouts. Optional **perAttemptTimeout** limits each attempt (including the first) so a single slow attempt does not consume the whole retry budget.
 ```kotlin
 import com.santimattius.resilient.retry.*
 
@@ -103,6 +103,7 @@ val policy = resilient {
     retry {
         maxAttempts = 4
         shouldRetry = { it is java.io.IOException }  // e.g. only retry IO; do not retry 4xx
+        perAttemptTimeout = 5.seconds               // optional: timeout per attempt
         backoffStrategy = ExponentialBackoff(
             initialDelay = 200.milliseconds,
             maxDelay = 5.seconds,
@@ -164,15 +165,21 @@ val policy = resilient {
 ```
 
 ### Cache (In-Memory TTL)
-Cache successful results per key with TTL.
+Cache successful results per key with TTL. Use a fixed **key** or a **keyProvider** (suspend) for dynamic keys (e.g. per user, per request). Invalidation is available via `policy.cacheHandle` when cache is configured.
 ```kotlin
-val policy = resilient {
+val policy = resilient(scope) {
     cache {
-        key = "users:123"
+        key = "users:123"                    // fixed key
+        // or keyProvider = { "user:${userId}" }  // dynamic key
         ttl = 30.seconds
     }
 }
+
+// Invalidate by key or prefix (e.g. after write)
+policy.cacheHandle?.invalidate("users:123")
+policy.cacheHandle?.invalidatePrefix("user:")
 ```
+The in-memory implementation is one possible `CachePolicy`; custom backends (e.g. persistent storage or Redis) can implement the same interface.
 
 ### Fallback
 Return a fallback value when the operation fails. **Ensure the fallback return type matches the type returned by the block** passed to `execute()`, otherwise a `ClassCastException` may occur at runtime.

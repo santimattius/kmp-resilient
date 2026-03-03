@@ -7,6 +7,7 @@ import com.santimattius.resilient.retry.LinearBackoff
 import com.santimattius.resilient.retry.RetryPolicyConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceTimeBy
@@ -18,6 +19,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalTime::class)
@@ -159,6 +161,31 @@ class RetryPolicyTest {
         assertFailsWith<CancellationException> {
             job.await()
         }
+    }
+
+    @Test
+    fun `given perAttemptTimeout when first attempt exceeds timeout then retries and second attempt succeeds`() = runTest {
+        val cfg = RetryPolicyConfig().apply {
+            maxAttempts = 3
+            perAttemptTimeout = 50.milliseconds
+            shouldRetry = { it is TimeoutCancellationException }
+            backoffStrategy = FixedBackoff(delay = 1.milliseconds)
+        }
+        val policy = DefaultRetryPolicy(cfg)
+        var attempts = 0
+
+        val result = policy.execute {
+            attempts++
+            if (attempts == 1) {
+                delay(100.milliseconds)
+                "first"
+            } else {
+                "ok"
+            }
+        }
+
+        assertEquals(2, attempts)
+        assertEquals("ok", result)
     }
 
     @Test

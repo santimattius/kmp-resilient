@@ -22,11 +22,16 @@ class ResilientViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ResilientUiState())
     val uiState: StateFlow<ResilientUiState> = _uiState.asStateFlow()
 
+    /** Current resource id used for cache key (dynamic key via keyProvider). */
+    private val _resourceId = MutableStateFlow("default")
+    val resourceId: StateFlow<String> = _resourceId.asStateFlow()
+
     private val resilientScope = ResilientScope(dispatcher = Dispatchers.Default)
 
     private val policy = resilient(resilientScope) {
         cache {
-            key = "demo-call"
+            key = "demo:default"
+            keyProvider = { "demo:${_resourceId.value}" }
             ttl = 30.seconds
             cleanupInterval = 60.seconds
             cleanupBatch = 50
@@ -34,6 +39,7 @@ class ResilientViewModel : ViewModel() {
         timeout { timeout = 2.seconds }
         retry {
             maxAttempts = 3
+            perAttemptTimeout = 800.milliseconds
             backoffStrategy = ExponentialBackoff(initialDelay = 100.milliseconds)
             shouldRetry = { it is IllegalStateException }
         }
@@ -43,6 +49,10 @@ class ResilientViewModel : ViewModel() {
             stagger = 50.milliseconds
         }
         fallback(FallbackConfig { e -> "fallback: ${e.message}" })
+    }
+
+    fun setResourceId(id: String) {
+        _resourceId.value = id
     }
 
     fun executePolicy() {
@@ -100,8 +110,29 @@ class ResilientViewModel : ViewModel() {
         }
     }
 
+    /** Invalidates the cache entry for the current resource (demo:resourceId). */
+    fun invalidateCache() {
+        viewModelScope.launch {
+            policy.cacheHandle?.invalidate("demo:${_resourceId.value}")
+            val currentEvents = _uiState.value.events
+            val updatedEvents = (currentEvents + "Cache invalidated: demo:${_resourceId.value}").takeLast(12)
+            _uiState.value = _uiState.value.copy(events = updatedEvents)
+        }
+    }
+
+    /** Invalidates all cache entries whose key starts with "demo:". */
+    fun invalidateCachePrefix() {
+        viewModelScope.launch {
+            policy.cacheHandle?.invalidatePrefix("demo:")
+            val currentEvents = _uiState.value.events
+            val updatedEvents = (currentEvents + "Cache invalidated (prefix: demo:)").takeLast(12)
+            _uiState.value = _uiState.value.copy(events = updatedEvents)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
+        policy.close()
         resilientScope.close()
     }
 }

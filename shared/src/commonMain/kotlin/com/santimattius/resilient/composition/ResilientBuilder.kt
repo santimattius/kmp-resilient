@@ -6,6 +6,7 @@ import com.santimattius.resilient.bulkhead.BulkheadConfig
 import com.santimattius.resilient.bulkhead.BulkheadFullException
 import com.santimattius.resilient.bulkhead.DefaultBulkhead
 import com.santimattius.resilient.cache.CacheConfig
+import com.santimattius.resilient.cache.CacheHandle
 import com.santimattius.resilient.cache.InMemoryCachePolicy
 import com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig
 import com.santimattius.resilient.circuitbreaker.DefaultCircuitBreaker
@@ -221,8 +222,8 @@ fun resilient(
         InMemoryCachePolicy(
             config = cfg,
             scope = resilientScope,
-            onCacheHit = { events.tryEmit(ResilientEvent.CacheHit(cfg.key)) },
-            onCacheMiss = { events.tryEmit(ResilientEvent.CacheMiss(cfg.key)) }
+            onCacheHit = { key -> events.tryEmit(ResilientEvent.CacheHit(key)) },
+            onCacheMiss = { key -> events.tryEmit(ResilientEvent.CacheMiss(key)) }
         )
     }
     val timeoutPolicy = builder.timeoutConfig?.let { cfg ->
@@ -243,6 +244,7 @@ fun resilient(
             maxAttempts = cfg.maxAttempts
             backoffStrategy = cfg.backoffStrategy
             shouldRetry = cfg.shouldRetry
+            perAttemptTimeout = cfg.perAttemptTimeout
             onRetry = { attempt, error ->
                 events.emit(ResilientEvent.RetryAttempt(attempt, error))
                 cfg.onRetry(attempt, error)
@@ -290,6 +292,9 @@ fun resilient(
     return object : ResilientPolicy {
         override val events: SharedFlow<ResilientEvent>
             get() = events.asSharedFlow()
+
+        override val cacheHandle: CacheHandle?
+            get() = cache
 
         override suspend fun <T> execute(block: Execute<T>): T {
             val mark = TimeSource.Monotonic.markNow()

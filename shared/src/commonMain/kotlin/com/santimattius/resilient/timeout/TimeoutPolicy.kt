@@ -24,6 +24,15 @@ interface TimeoutPolicy {
 /**
  * Configuration for a [TimeoutPolicy].
  *
+ * **Behaviour and composition:** This policy applies a single time limit to the execution of the block.
+ * When combined with [com.santimattius.resilient.retry.RetryPolicy], the order of composition matters:
+ * - **Timeout outer, Retry inner (default):** The timeout applies to the **entire** execution (all retries combined).
+ *   One slow attempt can use the full duration; when it expires, the whole operation fails.
+ * - **Retry outer, Timeout inner:** Each retry attempt has its own timeout. Use [ResilientBuilder.compositionOrder]
+ *   to place [OrderablePolicyType.RETRY] before [OrderablePolicyType.TIMEOUT].
+ *
+ * For a timeout **per retry attempt** without changing composition order, use [RetryPolicyConfig.perAttemptTimeout].
+ *
  * @property timeout The maximum allowed duration for the operation before it's considered timed out.
  *                   Defaults to 30 seconds. When converted to milliseconds for the underlying API, very large
  *                   values may overflow; keep duration within a reasonable range (e.g. under [Long.MAX_VALUE] ms).
