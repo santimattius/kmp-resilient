@@ -171,4 +171,38 @@ class BulkheadTest {
         assertFailsWith<CancellationException> { waiter.await() }
         assertFailsWith<CancellationException> { holder.await() }
     }
+
+    @Test
+    fun `given snapshot when no active calls then activeConcurrentCalls is zero`() = runTest {
+        val config = BulkheadConfig().apply {
+            maxConcurrentCalls = 4
+            maxWaitingCalls = 10
+        }
+        val bulkhead = DefaultBulkhead(config)
+
+        val snap = requireNotNull(bulkhead.snapshot())
+        assertEquals(0, snap.activeConcurrentCalls)
+        assertEquals(0, snap.waitingCalls)
+        assertEquals(4, snap.maxConcurrentCalls)
+        assertEquals(10, snap.maxWaitingCalls)
+    }
+
+    @Test
+    fun `given one call in progress when snapshot then activeConcurrentCalls is one`() = runTest {
+        val config = BulkheadConfig().apply {
+            maxConcurrentCalls = 4
+            maxWaitingCalls = 10
+        }
+        val bulkhead = DefaultBulkhead(config)
+
+        val holder = async { bulkhead.execute { kotlinx.coroutines.delay(500); "ok" } }
+        runCurrent()
+
+        val snap = requireNotNull(bulkhead.snapshot())
+        assertEquals(1, snap.activeConcurrentCalls)
+        assertEquals(0, snap.waitingCalls)
+
+        holder.cancel()
+        assertFailsWith<CancellationException> { holder.await() }
+    }
 }

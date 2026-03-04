@@ -44,11 +44,19 @@ class ResilientViewModel : ViewModel() {
             shouldRetry = { it is IllegalStateException }
         }
         circuitBreaker { failureThreshold = 3; successThreshold = 2; timeout = 10.seconds }
+        bulkhead {
+            maxConcurrentCalls = 4
+            maxWaitingCalls = 8
+        }
         hedging {
             attempts = 2
             stagger = 50.milliseconds
         }
         fallback(FallbackConfig { e -> "fallback: ${e.message}" })
+    }
+
+    init {
+        refreshHealthSnapshot()
     }
 
     fun setResourceId(id: String) {
@@ -105,6 +113,7 @@ class ResilientViewModel : ViewModel() {
                     )
                 } finally {
                     collector.cancel()
+                    refreshHealthSnapshot()
                 }
             }
         }
@@ -128,6 +137,11 @@ class ResilientViewModel : ViewModel() {
             val updatedEvents = (currentEvents + "Cache invalidated (prefix: demo:)").takeLast(12)
             _uiState.value = _uiState.value.copy(events = updatedEvents)
         }
+    }
+
+    /** Refreshes the health/readiness snapshot (circuit breaker state and bulkhead usage). */
+    fun refreshHealthSnapshot() {
+        _uiState.value = _uiState.value.copy(healthSnapshot = policy.getHealthSnapshot())
     }
 
     override fun onCleared() {

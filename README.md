@@ -129,7 +129,7 @@ val policy = resilient {
 ```
 
 ### Rate Limiter
-Token-bucket limiting, optional max wait when limited.
+Token-bucket rate limiting: tokens refill at the **start of each period** (fixed-window refill). With `maxCalls = 10` and `period = 1.seconds`, at most 10 calls per second are allowed. One bucket per policy (global limit). Optional max wait when limited.
 ```kotlin
 val policy = resilient {
     rateLimiter {
@@ -178,6 +178,24 @@ val policy = resilient(scope) {
 // Invalidate by key or prefix (e.g. after write)
 policy.cacheHandle?.invalidate("users:123")
 policy.cacheHandle?.invalidatePrefix("user:")
+```
+The in-memory implementation is one possible `CachePolicy`; custom backends (e.g. persistent storage or Redis) can implement the same interface.
+
+### Health / Readiness
+Use `policy.getHealthSnapshot()` to build health or readiness endpoints (e.g. Kubernetes probes, `/health` API). The snapshot includes circuit breaker state and counters, and bulkhead usage when configured.
+```kotlin
+import com.santimattius.resilient.circuitbreaker.CircuitState
+
+val snapshot = policy.getHealthSnapshot()
+
+// Circuit breaker: is the circuit open?
+val healthy = snapshot.circuitBreaker?.state != CircuitState.OPEN
+// Optional: snapshot.circuitBreaker?.failureCount, successCount for metrics
+
+// Bulkhead: active and waiting counts
+snapshot.bulkhead?.let { bh ->
+    // bh.activeConcurrentCalls, bh.waitingCalls, bh.maxConcurrentCalls, bh.maxWaitingCalls
+}
 ```
 The in-memory implementation is one possible `CachePolicy`; custom backends (e.g. persistent storage or Redis) can implement the same interface.
 
