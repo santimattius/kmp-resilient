@@ -7,12 +7,14 @@ import com.santimattius.resilient.composition.resilient
 import com.santimattius.resilient.fallback.FallbackConfig
 import com.santimattius.resilient.retry.ExponentialBackoff
 import com.santimattius.resilient.telemetry.ResilientEvent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -65,12 +67,7 @@ class ResilientViewModel : ViewModel() {
 
     fun executePolicy() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                result = null,
-                error = null,
-                events = emptyList(),
-                isLoading = true
-            )
+            _uiState.update { it.copy(result = null, error = null, events = emptyList(), isLoading = true) }
             coroutineScope {
                 val collector = launch {
                     policy.events.collect { event ->
@@ -87,9 +84,9 @@ class ResilientViewModel : ViewModel() {
                             is ResilientEvent.RateLimited -> "Rate limited: wait ${event.waitTime}"
                             is ResilientEvent.BulkheadRejected -> "Bulkhead: ${event.reason}"
                         }
-                        val currentEvents = _uiState.value.events
-                        val updatedEvents = (currentEvents + label).takeLast(12)
-                        _uiState.value = _uiState.value.copy(events = updatedEvents)
+                        _uiState.update { current ->
+                            current.copy(events = (current.events + label).takeLast(12))
+                        }
                     }
                 }
 
@@ -101,16 +98,11 @@ class ResilientViewModel : ViewModel() {
                         }
                         "OK"
                     }
-                    _uiState.value = _uiState.value.copy(
-                        result = value,
-                        error = null,
-                        isLoading = false
-                    )
+                    _uiState.update { it.copy(result = value, error = null, isLoading = false) }
+                } catch (t: CancellationException) {
+                    throw t
                 } catch (t: Throwable) {
-                    _uiState.value = _uiState.value.copy(
-                        error = t.message ?: t::class.simpleName ?: "Unknown error",
-                        isLoading = false
-                    )
+                    _uiState.update { it.copy(error = t.message ?: t::class.simpleName ?: "Unknown error", isLoading = false) }
                 } finally {
                     collector.cancel()
                     refreshHealthSnapshot()
@@ -123,9 +115,9 @@ class ResilientViewModel : ViewModel() {
     fun invalidateCache() {
         viewModelScope.launch {
             policy.cacheHandle?.invalidate("demo:${_resourceId.value}")
-            val currentEvents = _uiState.value.events
-            val updatedEvents = (currentEvents + "Cache invalidated: demo:${_resourceId.value}").takeLast(12)
-            _uiState.value = _uiState.value.copy(events = updatedEvents)
+            _uiState.update { current ->
+                current.copy(events = (current.events + "Cache invalidated: demo:${_resourceId.value}").takeLast(12))
+            }
         }
     }
 
@@ -133,15 +125,15 @@ class ResilientViewModel : ViewModel() {
     fun invalidateCachePrefix() {
         viewModelScope.launch {
             policy.cacheHandle?.invalidatePrefix("demo:")
-            val currentEvents = _uiState.value.events
-            val updatedEvents = (currentEvents + "Cache invalidated (prefix: demo:)").takeLast(12)
-            _uiState.value = _uiState.value.copy(events = updatedEvents)
+            _uiState.update { current ->
+                current.copy(events = (current.events + "Cache invalidated (prefix: demo:)").takeLast(12))
+            }
         }
     }
 
     /** Refreshes the health/readiness snapshot (circuit breaker state and bulkhead usage). */
     fun refreshHealthSnapshot() {
-        _uiState.value = _uiState.value.copy(healthSnapshot = policy.getHealthSnapshot())
+        _uiState.update { it.copy(healthSnapshot = policy.getHealthSnapshot()) }
     }
 
     override fun onCleared() {

@@ -26,9 +26,14 @@ import kotlinx.coroutines.withTimeout
  * this time, it is rejected.
  *
  * @param config The [BulkheadConfig] used to configure this instance.
+ * @param onRejected Optional callback invoked synchronously when a call is rejected before throwing
+ *                   [BulkheadFullException]. Receives a human-readable reason string. Used for telemetry
+ *                   (e.g. emitting [com.santimattius.resilient.telemetry.ResilientEvent.BulkheadRejected])
+ *                   regardless of whether a Fallback policy is configured.
  */
 class DefaultBulkhead(
     private val config: BulkheadConfig,
+    private val onRejected: ((reason: String) -> Unit)? = null,
 ) : Bulkhead {
 
     init {
@@ -56,7 +61,10 @@ class DefaultBulkhead(
 
     override suspend fun <T> execute(block: suspend () -> T): T {
         val acquired = tryAcquirePermit()
-        if (!acquired) throw BulkheadFullException()
+        if (!acquired) {
+            onRejected?.invoke("Bulkhead full: max concurrent and queue capacity reached")
+            throw BulkheadFullException()
+        }
         try {
             mutex.withLock { activeConcurrentCalls++ }
             return block()

@@ -779,6 +779,100 @@ class ResilientPolicyTest {
         }
     }
 
+    // ---------------------------------------------------------------------------
+    // Event-sequence tests: documenting double-emission patterns
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Documents the known double-emission when a timeout fires:
+     * TimeoutTriggered is emitted by the timeout policy itself, then OperationFailure
+     * is emitted by the outer execution wrapper with the same exception.
+     * Consumers must not double-count failures for metrics.
+     */
+    @Test
+    fun `given timeout policy when operation times out then emits TimeoutTriggered followed by OperationFailure`() =
+        runTest {
+            val scope = ResilientScope()
+            val policy = resilient(scope) {
+                timeout { timeout = 50.milliseconds }
+            }
+
+            policy.events.test {
+                assertFailsWith<TimeoutCancellationException> {
+                    policy.execute { delay(200.milliseconds); "never" }
+                }
+
+                val first = awaitItem()
+                assertIs<ResilientEvent.TimeoutTriggered>(first)
+                assertEquals(50.milliseconds, first.timeout)
+
+                val second = awaitItem()
+                assertIs<ResilientEvent.OperationFailure>(second)
+                assertIs<TimeoutCancellationException>(second.error)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /**
+     * Timeout (CancellationException) is NOT caught by Fallback.
+     * The event sequence must be: TimeoutTriggered → OperationFailure (no FallbackTriggered).
+     */
+    @Test
+    fun `given timeout and fallback when operation times out then TimeoutTriggered and OperationFailure are emitted without FallbackTriggered`() =
+        runTest {
+            val scope = ResilientScope()
+            val policy = resilient(scope) {
+                timeout { timeout = 50.milliseconds }
+                fallback(FallbackConfig { "fallback" })
+            }
+
+            policy.events.test {
+                assertFailsWith<TimeoutCancellationException> {
+                    policy.execute { delay(200.milliseconds); "never" }
+                }
+
+                val first = awaitItem()
+                assertIs<ResilientEvent.TimeoutTriggered>(first)
+
+                val second = awaitItem()
+                assertIs<ResilientEvent.OperationFailure>(second)
+                assertIs<TimeoutCancellationException>(second.error)
+
+                // No FallbackTriggered: timeout (CancellationException) must not be swallowed
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /**
+     * For non-cancellation failures, the sequence with Fallback must be:
+     * FallbackTriggered → OperationSuccess (not OperationFailure).
+     */
+    @Test
+    fun `given fallback when non-cancellation failure then emits FallbackTriggered and OperationSuccess`() =
+        runTest {
+            val scope = ResilientScope()
+            val policy = resilient(scope) {
+                fallback(FallbackConfig { "fallback" })
+            }
+
+            policy.events.test {
+                val result = policy.execute<String> {
+                    throw IllegalStateException("boom")
+                }
+                assertEquals("fallback", result)
+
+                val first = awaitItem()
+                assertIs<ResilientEvent.FallbackTriggered>(first)
+                assertIs<IllegalStateException>(first.error)
+
+                val second = awaitItem()
+                assertIs<ResilientEvent.OperationSuccess>(second)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
     @Test
     fun `given custom composition order when cache is first then cache is checked before other policies`() = runTest {
         // given

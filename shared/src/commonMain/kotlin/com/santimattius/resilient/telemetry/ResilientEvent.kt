@@ -62,6 +62,17 @@ sealed interface ResilientEvent {
 
     /**
      * Emitted when the operation exceeds the configured timeout and is cancelled.
+     *
+     * **Note:** A timeout always produces two events in sequence:
+     * 1. [TimeoutTriggered] — emitted immediately before the [kotlinx.coroutines.TimeoutCancellationException] propagates.
+     * 2. [OperationFailure] — emitted from the outer execution wrapper with the same exception.
+     *
+     * If a [FallbackTriggered] follows instead of [OperationFailure], a Fallback policy is configured and the
+     * timeout was caught by it (which is unexpected — timeouts are [kotlinx.coroutines.CancellationException]
+     * and are not swallowed by [com.santimattius.resilient.fallback.FallbackPolicy]).
+     * Consumers should treat [TimeoutTriggered] as the definitive signal of a timeout, and avoid
+     * double-counting [OperationFailure] for metric purposes.
+     *
      * @property timeout The configured timeout duration that was exceeded.
      */
     data class TimeoutTriggered(val timeout: Duration) : ResilientEvent
@@ -87,6 +98,12 @@ sealed interface ResilientEvent {
 
     /**
      * Emitted after a failed operation, capturing the triggering error and the execution duration.
+     *
+     * **Note on double emission with [TimeoutTriggered]:** When a timeout occurs, both [TimeoutTriggered]
+     * and [OperationFailure] are emitted for the same operation. [TimeoutTriggered] fires first (immediately
+     * before the exception propagates), then [OperationFailure] fires from the outer wrapper. Consumers
+     * building metrics should use [TimeoutTriggered] to classify timeout failures and avoid counting
+     * [OperationFailure] twice for the same event.
      *
      * @property error The [Throwable] that caused the operation to fail.
      * @property duration The measured execution time of the failed operation.

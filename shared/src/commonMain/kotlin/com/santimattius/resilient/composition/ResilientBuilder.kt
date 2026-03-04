@@ -3,7 +3,6 @@ package com.santimattius.resilient.composition
 import com.santimattius.resilient.ResilientPolicy
 import com.santimattius.resilient.annotations.ResilientExperimentalApi
 import com.santimattius.resilient.bulkhead.BulkheadConfig
-import com.santimattius.resilient.bulkhead.BulkheadFullException
 import com.santimattius.resilient.bulkhead.DefaultBulkhead
 import com.santimattius.resilient.cache.CacheConfig
 import com.santimattius.resilient.cache.CacheHandle
@@ -278,7 +277,11 @@ fun resilient(
         )
     }
 
-    val bulkhead = builder.bulkheadConfig?.let { DefaultBulkhead(it) }
+    val bulkhead = builder.bulkheadConfig?.let { cfg ->
+        DefaultBulkhead(cfg) { reason ->
+            events.tryEmit(ResilientEvent.BulkheadRejected(reason))
+        }
+    }
     val hedging = builder.hedgingConfig?.let { cfg ->
         DefaultHedgingPolicy(cfg) { attemptIndex ->
             events.tryEmit(ResilientEvent.HedgingUsed(attemptIndex))
@@ -321,9 +324,6 @@ fun resilient(
                 events.emit(ResilientEvent.OperationSuccess(mark.elapsedNow()))
                 result
             } catch (t: Throwable) {
-                if (t is BulkheadFullException) {
-                    events.tryEmit(ResilientEvent.BulkheadRejected("Bulkhead full: max concurrent and queue capacity reached"))
-                }
                 events.emit(ResilientEvent.OperationFailure(t, mark.elapsedNow()))
                 throw t
             }

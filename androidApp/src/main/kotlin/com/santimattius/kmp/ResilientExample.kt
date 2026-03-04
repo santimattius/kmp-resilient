@@ -6,14 +6,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.safeContentPadding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -58,21 +60,29 @@ fun ResilientExample(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 listOf("default", "a", "b").forEach { id ->
-                    Button(
-                        onClick = { viewModel.setResourceId(id) },
-                        modifier = Modifier.weight(1f),
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .selectable(
+                                selected = resourceId == id,
+                                onClick = { viewModel.setResourceId(id) }
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        RadioButton(
+                            selected = resourceId == id,
+                            onClick = { viewModel.setResourceId(id) },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = MaterialTheme.colorScheme.primary,
+                                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        )
                         Text(id)
                     }
                 }
             }
 
-            Button(
-                onClick = { viewModel.executePolicy() },
-                enabled = !uiState.isLoading
-            ) {
-                Text("Run resilient call")
-            }
+
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -99,6 +109,13 @@ fun ResilientExample(
                 enabled = !uiState.isLoading,
             ) {
                 Text("Refresh health")
+            }
+
+            Button(
+                onClick = { viewModel.executePolicy() },
+                enabled = !uiState.isLoading
+            ) {
+                Text("Run resilient call")
             }
             uiState.healthSnapshot?.let { snap ->
                 Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {

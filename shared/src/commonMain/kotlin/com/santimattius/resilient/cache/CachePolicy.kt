@@ -204,8 +204,7 @@ internal class InMemoryCachePolicy(
 
     override suspend fun invalidatePrefix(prefix: String) {
         mutex.withLock {
-            val keysToRemove = store.keys.filter { it.startsWith(prefix) }
-            keysToRemove.forEach { store.remove(it) }
+            store.keys.removeAll { it.startsWith(prefix) }
         }
     }
 
