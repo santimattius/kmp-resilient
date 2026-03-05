@@ -113,7 +113,7 @@ Planned items: cache (dynamic key, invalidation), timeout (documentation and per
 
 ---
 
-[Unreleased]: https://github.com/santimattius/kmp-resilient/compare/1.2.0...HEAD
+[1.3.0-ALPHA01]: https://github.com/santimattius/kmp-resilient/compare/1.2.0...1.3.0-ALPHA01
 [1.2.0]: https://github.com/santimattius/kmp-resilient/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/santimattius/kmp-resilient/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/santimattius/kmp-resilient/compare/1.0.0-ALPHA04...1.0.0
