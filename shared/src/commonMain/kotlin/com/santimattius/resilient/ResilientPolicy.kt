@@ -1,7 +1,25 @@
 package com.santimattius.resilient
 
+import com.santimattius.resilient.cache.CacheHandle
+import com.santimattius.resilient.circuitbreaker.CircuitBreakerSnapshot
+import com.santimattius.resilient.bulkhead.BulkheadSnapshot
 import com.santimattius.resilient.telemetry.ResilientEvent
 import kotlinx.coroutines.flow.SharedFlow
+
+/**
+ * Point-in-time snapshot of policy state for health/readiness endpoints and metrics.
+ *
+ * Use [ResilientPolicy.getHealthSnapshot] to build this. Expose it in your health endpoint
+ * (e.g. Kubernetes readiness/liveness, or a `/health` API) so load balancers and orchestrators
+ * can decide whether to route traffic.
+ *
+ * @property circuitBreaker Snapshot of circuit breaker state and counters; null if no circuit breaker was configured.
+ * @property bulkhead Snapshot of bulkhead usage; null if no bulkhead was configured or the implementation does not support snapshot.
+ */
+data class PolicyHealthSnapshot(
+    val circuitBreaker: CircuitBreakerSnapshot? = null,
+    val bulkhead: BulkheadSnapshot? = null
+)
 
 /**
  * A comprehensive resilience policy that orchestrates multiple strategies to safeguard suspendable operations.
@@ -38,6 +56,27 @@ interface ResilientPolicy : AutoCloseable {
      * the health and performance of the decorated operations.
      */
     val events: SharedFlow<ResilientEvent>
+
+    /**
+     * Optional handle for cache invalidation when the policy was built with cache enabled.
+     *
+     * Use [CacheHandle.invalidate] to remove a single entry by key, or [CacheHandle.invalidatePrefix]
+     * to remove all entries whose key starts with a given prefix (e.g. `"user:"`).
+     * `null` if no cache was configured.
+     */
+    val cacheHandle: CacheHandle?
+        get() = null
+
+    /**
+     * Returns a point-in-time snapshot of policy state for health/readiness and metrics.
+     *
+     * Use this to build health endpoints (e.g. Kubernetes readiness probe, or `/health` API).
+     * When circuit breaker is configured, check [PolicyHealthSnapshot.circuitBreaker]?.state for OPEN;
+     * when bulkhead is configured, you can expose [PolicyHealthSnapshot.bulkhead] for concurrent/waiting counts.
+     *
+     * @return [PolicyHealthSnapshot] with circuit breaker and bulkhead snapshots when configured.
+     */
+    fun getHealthSnapshot(): PolicyHealthSnapshot = PolicyHealthSnapshot()
 
     /**
      * Executes the provided suspendable [block] of code under the control of the composed resilience policies.

@@ -9,6 +9,13 @@ import kotlin.time.Duration.Companion.seconds
  * Implementations of this interface decorate a suspend function call, controlling the rate at which
  * it can be executed. If the call rate exceeds the configured limit, the `execute` method
  * will either suspend until permission is granted or throw a [RateLimitExceededException].
+ *
+ * **Semantics (token-bucket):** The default implementation ([DefaultRateLimiter]) uses a token-bucket
+ * strategy. Up to [RateLimiterConfig.maxCalls] tokens are available; each [execute] consumes one.
+ * Tokens refill by **adding [maxCalls] tokens at the start of each [RateLimiterConfig.period]** (fixed
+ * window refill). For example, with maxCalls=10 and period=1s, at most 10 calls per second are allowed;
+ * after 1s from the last refill, the bucket is refilled with 10 tokens. This is a per-policy limit
+ * (single bucket). For per-key or per-tenant limits, a custom implementation or wrapper would be needed.
  */
 interface RateLimiter {
     /**

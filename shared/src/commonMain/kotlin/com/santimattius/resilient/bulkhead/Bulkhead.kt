@@ -24,6 +24,12 @@ interface Bulkhead {
      * @throws BulkheadFullException When no permit is available and the wait queue is full (or wait times out if configured).
      */
     suspend fun <T> execute(block: suspend () -> T): T
+
+    /**
+     * Returns a point-in-time snapshot of bulkhead usage for health/readiness and metrics.
+     * Implementations that support it return a [BulkheadSnapshot]; others may return null.
+     */
+    fun snapshot(): BulkheadSnapshot? = null
 }
 
 /**
@@ -38,6 +44,21 @@ class BulkheadConfig {
     var maxWaitingCalls: Int = 100
     var timeout: kotlin.time.Duration? = null
 }
+
+/**
+ * Point-in-time snapshot of a [Bulkhead] for health/readiness and metrics.
+ *
+ * @property activeConcurrentCalls Number of calls currently executing.
+ * @property waitingCalls Number of callers currently waiting for a permit.
+ * @property maxConcurrentCalls Maximum allowed concurrent executions.
+ * @property maxWaitingCalls Maximum allowed waiting callers.
+ */
+data class BulkheadSnapshot(
+    val activeConcurrentCalls: Int,
+    val waitingCalls: Int,
+    val maxConcurrentCalls: Int,
+    val maxWaitingCalls: Int
+)
 
 /**
  * Exception thrown when the bulkhead cannot accept a new call.

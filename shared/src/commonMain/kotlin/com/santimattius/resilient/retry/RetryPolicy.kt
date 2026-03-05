@@ -1,5 +1,7 @@
 package com.santimattius.resilient.retry
 
+import kotlin.time.Duration
+
 /**
  * Defines a contract for implementing resilience strategies that automatically retry
  * a failed operation.
@@ -36,12 +38,18 @@ interface RetryPolicy {
  * @property onRetry A suspendable callback function that is executed before each retry attempt.
  *   It receives the current attempt number and the error that caused the failure.
  *   Defaults to an empty lambda.
+ * @property perAttemptTimeout If set, each attempt (including the first) is limited to this duration.
+ *   When exceeded, the attempt is cancelled and may be retried according to [shouldRetry]
+ *   (e.g. [kotlinx.coroutines.TimeoutCancellationException] is typically retryable).
+ *   Use this when you want a timeout per attempt rather than a single global timeout from a [TimeoutPolicy].
+ *   Defaults to `null` (no per-attempt timeout).
  */
 class RetryPolicyConfig {
     var maxAttempts: Int = 3
     var backoffStrategy: BackoffStrategy = ExponentialBackoff()
     var shouldRetry: (Throwable) -> Boolean = { true }
     var onRetry: suspend (attempt: Int, error: Throwable) -> Unit = { _, _ -> }
+    var perAttemptTimeout: Duration? = null
 }
 
 /**

@@ -27,6 +27,56 @@ import kotlin.time.Duration.Companion.seconds
 class CircuitBreakerTest {
 
     @Test
+    fun `given CLOSED state when snapshot then returns state and zero counts`() = runTest {
+        val cfg = CircuitBreakerConfig().apply {
+            failureThreshold = 3
+            successThreshold = 2
+            timeout = 1.seconds
+            halfOpenMaxCalls = 1
+        }
+        val cb = DefaultCircuitBreaker(cfg)
+
+        val snap = cb.snapshot()
+        assertEquals(CircuitState.CLOSED, snap.state)
+        assertEquals(0, snap.failureCount)
+        assertEquals(0, snap.successCount)
+    }
+
+    @Test
+    fun `given failures when snapshot then returns updated failureCount`() = runTest {
+        val cfg = CircuitBreakerConfig().apply {
+            failureThreshold = 3
+            successThreshold = 2
+            timeout = 1.seconds
+            halfOpenMaxCalls = 1
+        }
+        val cb = DefaultCircuitBreaker(cfg)
+
+        assertFailsWith<Throwable> { cb.execute { error("1") } }
+        assertEquals(1, cb.snapshot().failureCount)
+        assertEquals(CircuitState.CLOSED, cb.snapshot().state)
+
+        assertFailsWith<Throwable> { cb.execute { error("2") } }
+        assertEquals(2, cb.snapshot().failureCount)
+    }
+
+    @Test
+    fun `given OPEN state when snapshot then returns OPEN and counts`() = runTest {
+        val cfg = CircuitBreakerConfig().apply {
+            failureThreshold = 2
+            successThreshold = 1
+            timeout = 60.seconds
+            halfOpenMaxCalls = 1
+        }
+        val cb = DefaultCircuitBreaker(cfg)
+        repeat(2) { assertFailsWith<Throwable> { cb.execute { error("boom") } } }
+
+        val snap = cb.snapshot()
+        assertEquals(CircuitState.OPEN, snap.state)
+        assertEquals(2, snap.failureCount)
+    }
+
+    @Test
     fun `given CLOSED state when failures reach threshold then circuit opens`() = runTest {
         // given
         val cfg = CircuitBreakerConfig().apply {

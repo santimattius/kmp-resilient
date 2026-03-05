@@ -40,7 +40,28 @@ interface CircuitBreaker {
      * The current state of the circuit: [CircuitState.CLOSED], [CircuitState.OPEN], or [CircuitState.HALF_OPEN].
      */
     val state: StateFlow<CircuitState>
+
+    /**
+     * Returns a point-in-time snapshot of the circuit breaker state and counters.
+     * Use for health endpoints, dashboards, or metrics without subscribing to [state] or events.
+     *
+     * @return [CircuitBreakerSnapshot] with current [CircuitBreakerSnapshot.state], [CircuitBreakerSnapshot.failureCount], and [CircuitBreakerSnapshot.successCount].
+     */
+    fun snapshot(): CircuitBreakerSnapshot
 }
+
+/**
+ * Point-in-time snapshot of a [CircuitBreaker] for health/readiness and metrics.
+ *
+ * @property state Current circuit state (CLOSED, OPEN, HALF_OPEN).
+ * @property failureCount Number of consecutive failures in CLOSED state (reset on success or when opening).
+ * @property successCount Number of consecutive successes in HALF_OPEN state (reset when circuit opens or closes).
+ */
+data class CircuitBreakerSnapshot(
+    val state: CircuitState,
+    val failureCount: Int,
+    val successCount: Int
+)
 
 /**
  * Represents the three states of the circuit breaker.

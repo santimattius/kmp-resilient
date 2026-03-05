@@ -21,6 +21,15 @@ import kotlin.time.ExperimentalTime
  * The `execute` method will first attempt to retrieve a result from the cache.
  * If the data is not found or has expired, it will execute the provided [block],
  * store its result in the cache, and then return it.
+ *
+ * **Custom implementations:** You can provide your own [CachePolicy] for persistent
+ * storage (e.g. multiplatform settings, SQLDelight), or external caches (e.g. Redis).
+ * Implement [execute] to resolve the key (from [CacheConfig.key] or [CacheConfig.keyProvider]),
+ * look up the cache, and on miss run [block] and store the result. For invalidation support,
+ * implement [CacheHandle] as well and expose it via your builder or policy.
+ *
+ * **Key resolution:** If the config uses [CacheConfig.keyProvider], invoke it at the start of
+ * [execute] to get the key for this request; otherwise use [CacheConfig.key].
  */
 interface CachePolicy {
     /**
@@ -33,12 +42,39 @@ interface CachePolicy {
 }
 
 /**
+ * Optional capability for cache policies that support invalidation by key or prefix.
+ *
+ * Use [ResilientPolicy.cacheHandle] to obtain this when the policy was built with cache enabled.
+ * [InMemoryCachePolicy] implements this interface.
+ */
+interface CacheHandle {
+    /**
+     * Removes the cache entry for [key], if present.
+     */
+    suspend fun invalidate(key: String)
+
+    /**
+     * Removes all cache entries whose key starts with [prefix].
+     * No-op if no keys match.
+     */
+    suspend fun invalidatePrefix(prefix: String)
+}
+
+/**
  * Configuration for a [CachePolicy].
  *
  * This class is used to configure the behavior of a cache policy, such as setting
  * a unique key for a cache entry, its time-to-live (TTL), and periodic cleanup parameters.
  *
- * @property key The unique identifier for a cache entry. Defaults to "default".
+ * **Cache key:** Use [key] for a fixed key, or [keyProvider] for a key derived at execution time
+ * (e.g. from request context, user id, or arguments captured in the lambda). If [keyProvider] is
+ * set, it is invoked on each [CachePolicy.execute] and its result is used as the cache key;
+ * otherwise [key] is used. This allows reusing the same cache policy for multiple logical
+ * resources (e.g. `keyProvider = { "user:${userId}" }`).
+ *
+ * @property key The unique identifier for a cache entry when [keyProvider] is null. Defaults to "default".
+ * @property keyProvider Optional suspend lambda that returns the cache key at execution time.
+ *                       If set, takes precedence over [key]. Use for dynamic keys (e.g. per-request, per-tenant).
  * @property ttl The duration for which a cache entry is valid (time-to-live).
  *               After this period, the entry is considered expired. Defaults to 60 seconds.
  * @property cleanupInterval The interval at which expired cache entries are automatically removed.
@@ -49,6 +85,7 @@ interface CachePolicy {
  */
 class CacheConfig {
     var key: String = "default"
+    var keyProvider: (suspend () -> String)? = null
     var ttl: Duration = 60.seconds
     var cleanupInterval: Duration? = null
     var cleanupBatch: Int = 100
@@ -71,15 +108,15 @@ class CacheConfig {
  *
  * @param config The [CacheConfig] specifying the cache key and time-to-live (TTL).
  * @param scope Optional [ResilientScope] used to launch the cleanup job when [CacheConfig.cleanupInterval] is set.
- * @param onCacheHit Optional callback invoked when a cache hit occurs (optional telemetry).
- * @param onCacheMiss Optional callback invoked when the block is executed due to a cache miss (optional telemetry).
+ * @param onCacheHit Optional callback invoked when a cache hit occurs; receives the resolved cache key (optional telemetry).
+ * @param onCacheMiss Optional callback invoked when the block is executed due to a cache miss; receives the resolved cache key (optional telemetry).
  */
 internal class InMemoryCachePolicy(
     private val config: CacheConfig,
     scope: ResilientScope? = null,
-    private val onCacheHit: (() -> Unit)? = null,
-    private val onCacheMiss: (() -> Unit)? = null
-) : CachePolicy, AutoCloseable {
+    private val onCacheHit: ((key: String) -> Unit)? = null,
+    private val onCacheMiss: ((key: String) -> Unit)? = null
+) : CachePolicy, CacheHandle, AutoCloseable {
 
     private data class Entry(val value: Any?, val expiresAt: Long)
 
@@ -102,40 +139,43 @@ internal class InMemoryCachePolicy(
 
     @Suppress("UNCHECKED_CAST")
     override suspend fun <T> execute(block: suspend () -> T): T = coroutineScope {
-        val key = config.key
-        val now = currentTimeMillis()
+        val key = config.keyProvider?.invoke() ?: config.key
 
-        mutex.withLock {
+        // Single atomic lock: cache check + ongoing dedup.
+        // Merging both operations closes the race condition window where a completed
+        // Deferred could be removed from `ongoing` before a new caller entered the
+        // second lock, causing block() to be called again despite a cached result.
+        val deferred: Deferred<Any?> = mutex.withLock {
+            val now = currentTimeMillis()
             store[key]?.let { entry ->
                 if (now < entry.expiresAt) {
-                    onCacheHit?.invoke()
+                    onCacheHit?.invoke(key)
                     return@coroutineScope entry.value as T
                 }
                 store.remove(key)
             }
-        }
 
-        val deferred: Deferred<Any?> = mutex.withLock {
             ongoing.getOrPut(key) {
                 async {
-                    try {
-                        onCacheMiss?.invoke()
-                        val result = block()
-                        val expiresAt = currentTimeMillis() + config.ttl.inWholeMilliseconds
-                        mutex.withLock {
-                            store[key] = Entry(result, expiresAt)
-                        }
-                        result
-                    } finally {
-                        mutex.withLock {
-                            ongoing.remove(key)
-                        }
-                    }
+                    onCacheMiss?.invoke(key)
+                    block()
                 }
             }
         }
 
-        deferred.await() as T
+        try {
+            val result = deferred.await() as T
+            mutex.withLock {
+                if (store[key] == null) {
+                    store[key] = Entry(result, currentTimeMillis() + config.ttl.inWholeMilliseconds)
+                }
+                ongoing.remove(key)
+            }
+            result
+        } catch (e: Throwable) {
+            mutex.withLock { ongoing.remove(key) }
+            throw e
+        }
     }
 
     @OptIn(ExperimentalTime::class)
@@ -153,6 +193,18 @@ internal class InMemoryCachePolicy(
                     removed++
                 }
             }
+        }
+    }
+
+    override suspend fun invalidate(key: String) {
+        mutex.withLock {
+            store.remove(key)
+        }
+    }
+
+    override suspend fun invalidatePrefix(prefix: String) {
+        mutex.withLock {
+            store.keys.removeAll { it.startsWith(prefix) }
         }
     }
 

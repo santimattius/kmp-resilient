@@ -72,6 +72,23 @@ class DefaultCircuitBreaker(
     @Volatile
     private var successCount: Int = 0
 
+    /**
+     * Returns a point-in-time snapshot of the circuit breaker state.
+     *
+     * **Thread-safety note:** The three fields ([CircuitBreakerSnapshot.state], [CircuitBreakerSnapshot.failureCount],
+     * [CircuitBreakerSnapshot.successCount]) are read from `@Volatile` fields without holding the internal [Mutex].
+     * Each field is individually visible across threads, but the combination may be momentarily inconsistent
+     * (e.g. `state` could reflect CLOSED while `failureCount` has already been reset by a transition to OPEN).
+     * This is an intentional trade-off: the snapshot is an **approximation** suitable for health-check endpoints
+     * and dashboards, not for strict invariant enforcement. The cost of a mutex-protected read for every
+     * health probe would outweigh the benefit given the short window of inconsistency.
+     */
+    override fun snapshot(): CircuitBreakerSnapshot = CircuitBreakerSnapshot(
+        state = _state.value,
+        failureCount = failureCount,
+        successCount = successCount
+    )
+
     @Volatile
     private var openUntilMs: Long = 0L
 

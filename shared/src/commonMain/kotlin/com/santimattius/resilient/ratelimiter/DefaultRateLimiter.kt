@@ -18,15 +18,15 @@ import kotlin.time.Duration.Companion.milliseconds
 /**
  * A default, thread-safe implementation of the [RateLimiter] interface that uses a token-bucket algorithm.
  *
- * This rate limiter controls the rate of operation execution by managing a pool of "tokens".
- * Each call to [execute] attempts to consume one token. Tokens are replenished periodically
- * according to the settings in the provided [RateLimiterConfig].
+ * **Refill semantics:** Tokens refill at the **start of each [RateLimiterConfig.period]** (fixed-window refill).
+ * When a full period has elapsed since the last refill, the bucket is refilled with [RateLimiterConfig.maxCalls]
+ * tokens (capped at maxCalls). So with maxCalls=10 and period=1s, you get at most 10 calls per second,
+ * with the "window" aligned to when the bucket was last refilled. This is a single global bucket per policy.
  *
- * When `execute` is called and no tokens are available, the rate limiter calculates the time
- * until the next token becomes available. It then has two behaviors based on the configuration:
- * 1. If [RateLimiterConfig.timeoutWhenLimited] is `null`, it immediately throws a [RateLimitExceededException].
- * 2. If a timeout is configured, it will wait for the required duration. However, if this wait time
- *    exceeds the configured timeout, it will throw a [RateLimitExceededException] instead of waiting.
+ * Each call to [execute] consumes one token. When no tokens are available:
+ * 1. If [RateLimiterConfig.timeoutWhenLimited] is `null`, it immediately throws [RateLimitExceededException].
+ * 2. If a timeout is configured, it waits up to that duration for the next refill; if the wait would exceed
+ *    the timeout, it throws [RateLimitExceededException].
  *
  * This implementation is thread-safe. Access to the token count is synchronized.
  *

@@ -3,9 +3,9 @@ package com.santimattius.resilient.composition
 import com.santimattius.resilient.ResilientPolicy
 import com.santimattius.resilient.annotations.ResilientExperimentalApi
 import com.santimattius.resilient.bulkhead.BulkheadConfig
-import com.santimattius.resilient.bulkhead.BulkheadFullException
 import com.santimattius.resilient.bulkhead.DefaultBulkhead
 import com.santimattius.resilient.cache.CacheConfig
+import com.santimattius.resilient.cache.CacheHandle
 import com.santimattius.resilient.cache.InMemoryCachePolicy
 import com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig
 import com.santimattius.resilient.circuitbreaker.DefaultCircuitBreaker
@@ -17,6 +17,7 @@ import com.santimattius.resilient.ratelimiter.DefaultRateLimiter
 import com.santimattius.resilient.ratelimiter.RateLimiterConfig
 import com.santimattius.resilient.retry.DefaultRetryPolicy
 import com.santimattius.resilient.retry.RetryPolicyConfig
+import com.santimattius.resilient.PolicyHealthSnapshot
 import com.santimattius.resilient.telemetry.ResilientEvent
 import com.santimattius.resilient.timeout.DefaultTimeoutPolicy
 import com.santimattius.resilient.timeout.TimeoutConfig
@@ -221,8 +222,8 @@ fun resilient(
         InMemoryCachePolicy(
             config = cfg,
             scope = resilientScope,
-            onCacheHit = { events.tryEmit(ResilientEvent.CacheHit(cfg.key)) },
-            onCacheMiss = { events.tryEmit(ResilientEvent.CacheMiss(cfg.key)) }
+            onCacheHit = { key -> events.tryEmit(ResilientEvent.CacheHit(key)) },
+            onCacheMiss = { key -> events.tryEmit(ResilientEvent.CacheMiss(key)) }
         )
     }
     val timeoutPolicy = builder.timeoutConfig?.let { cfg ->
@@ -243,6 +244,7 @@ fun resilient(
             maxAttempts = cfg.maxAttempts
             backoffStrategy = cfg.backoffStrategy
             shouldRetry = cfg.shouldRetry
+            perAttemptTimeout = cfg.perAttemptTimeout
             onRetry = { attempt, error ->
                 events.emit(ResilientEvent.RetryAttempt(attempt, error))
                 cfg.onRetry(attempt, error)
@@ -275,7 +277,11 @@ fun resilient(
         )
     }
 
-    val bulkhead = builder.bulkheadConfig?.let { DefaultBulkhead(it) }
+    val bulkhead = builder.bulkheadConfig?.let { cfg ->
+        DefaultBulkhead(cfg) { reason ->
+            events.tryEmit(ResilientEvent.BulkheadRejected(reason))
+        }
+    }
     val hedging = builder.hedgingConfig?.let { cfg ->
         DefaultHedgingPolicy(cfg) { attemptIndex ->
             events.tryEmit(ResilientEvent.HedgingUsed(attemptIndex))
@@ -290,6 +296,14 @@ fun resilient(
     return object : ResilientPolicy {
         override val events: SharedFlow<ResilientEvent>
             get() = events.asSharedFlow()
+
+        override val cacheHandle: CacheHandle?
+            get() = cache
+
+        override fun getHealthSnapshot(): PolicyHealthSnapshot = PolicyHealthSnapshot(
+            circuitBreaker = circuitBreaker?.snapshot(),
+            bulkhead = bulkhead?.snapshot()
+        )
 
         override suspend fun <T> execute(block: Execute<T>): T {
             val mark = TimeSource.Monotonic.markNow()
@@ -310,9 +324,6 @@ fun resilient(
                 events.emit(ResilientEvent.OperationSuccess(mark.elapsedNow()))
                 result
             } catch (t: Throwable) {
-                if (t is BulkheadFullException) {
-                    events.tryEmit(ResilientEvent.BulkheadRejected("Bulkhead full: max concurrent and queue capacity reached"))
-                }
                 events.emit(ResilientEvent.OperationFailure(t, mark.elapsedNow()))
                 throw t
             }
