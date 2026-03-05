@@ -5,8 +5,9 @@ All notable changes to the Resilient KMP library are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-
 ## [Unreleased]
+
+## [1.3.0-ALPHA01] - 2026-03-04
 
 Planned items: cache (dynamic key, invalidation), timeout (documentation and per-attempt), health/readiness, Circuit Breaker snapshot, and Rate Limiter documentation. Some of these may already be in `main` / 1.2.0; confirm in code and README.
 
