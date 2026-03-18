@@ -4,7 +4,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
@@ -43,6 +45,19 @@ class ResilientScope(
         start: CoroutineStart = CoroutineStart.DEFAULT,
         block: suspend CoroutineScope.() -> Unit
     ) = _scope.launch(context, start, block)
+
+    /**
+     * Launches a coroutine in this scope for internal policy work and returns its [Deferred].
+     *
+     * This is primarily useful for features that need to deduplicate work across multiple
+     * callers (e.g. request coalescing) without coupling the in-flight operation lifetime to
+     * the lifetime of the first caller.
+     */
+    fun <T> async(
+        context: CoroutineContext = EmptyCoroutineContext,
+        start: CoroutineStart = CoroutineStart.DEFAULT,
+        block: suspend CoroutineScope.() -> T
+    ): Deferred<T> = _scope.async(context, start, block)
 
     /**
      * Cancels this scope and all its child coroutines. Call when the resilience policy is no longer needed.

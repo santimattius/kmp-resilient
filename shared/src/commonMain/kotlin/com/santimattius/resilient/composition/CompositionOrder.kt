@@ -8,7 +8,7 @@ package com.santimattius.resilient.composition
  * This ensures it can catch all failures from other policies.
  *
  * The default order is:
- * Fallback → Cache → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging
+ * Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging
  *
  * This order ensures that:
  * - Fallback wraps outermost to handle failures after all policies (always enforced)
@@ -40,6 +40,7 @@ internal class CompositionOrder(
         listOf(PolicyType.FALLBACK) + fullOrder.map { orderableType ->
             when (orderableType) {
                 OrderablePolicyType.CACHE -> PolicyType.CACHE
+                OrderablePolicyType.COALESCE -> PolicyType.COALESCE
                 OrderablePolicyType.TIMEOUT -> PolicyType.TIMEOUT
                 OrderablePolicyType.RETRY -> PolicyType.RETRY
                 OrderablePolicyType.CIRCUIT_BREAKER -> PolicyType.CIRCUIT_BREAKER
@@ -53,6 +54,7 @@ internal class CompositionOrder(
     companion object {
         private val defaultOrderableOrder = listOf(
             OrderablePolicyType.CACHE,
+            OrderablePolicyType.COALESCE,
             OrderablePolicyType.TIMEOUT,
             OrderablePolicyType.RETRY,
             OrderablePolicyType.CIRCUIT_BREAKER,
@@ -61,11 +63,12 @@ internal class CompositionOrder(
             OrderablePolicyType.HEDGING
         )
         /**
-         * Default composition order: Fallback → Cache → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging
+         * Default composition order: Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging
          */
         val DEFAULT = CompositionOrder(
             listOf(
                 OrderablePolicyType.CACHE,
+                OrderablePolicyType.COALESCE,
                 OrderablePolicyType.TIMEOUT,
                 OrderablePolicyType.RETRY,
                 OrderablePolicyType.CIRCUIT_BREAKER,
