@@ -702,4 +702,38 @@ class CircuitBreakerTest {
         assertEquals("result-2", result2)
         assertEquals(CircuitState.CLOSED, cb.state.value)
     }
+
+    @Test
+    fun `given sliding window when failures within window reach threshold then opens`() = runTest {
+        val ts = TestTimeSource()
+        val cfg = CircuitBreakerConfig().apply {
+            failureThreshold = 2
+            slidingWindow = 60.seconds
+            successThreshold = 1
+            timeout = 10.seconds
+            halfOpenMaxCalls = 1
+        }
+        val cb = DefaultCircuitBreaker(cfg, ts)
+        assertFailsWith<Throwable> { cb.execute { error("a") } }
+        assertFailsWith<Throwable> { cb.execute { error("b") } }
+        assertEquals(CircuitState.OPEN, cb.state.value)
+    }
+
+    @Test
+    fun `given sliding window when failures fall outside window then circuit stays closed`() = runTest {
+        val ts = TestTimeSource()
+        val cfg = CircuitBreakerConfig().apply {
+            failureThreshold = 2
+            slidingWindow = 1000.milliseconds
+            successThreshold = 1
+            timeout = 10.seconds
+            halfOpenMaxCalls = 1
+        }
+        val cb = DefaultCircuitBreaker(cfg, ts)
+        assertFailsWith<Throwable> { cb.execute { error("a") } }
+        ts.advanceTimeBy(1001)
+        assertFailsWith<Throwable> { cb.execute { error("b") } }
+        assertEquals(CircuitState.CLOSED, cb.state.value)
+        assertEquals(1, cb.snapshot().failureCount)
+    }
 }

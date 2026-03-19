@@ -8,6 +8,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.Volatile
+import kotlin.collections.ArrayDeque
 import kotlin.math.max
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -60,7 +61,18 @@ class DefaultCircuitBreaker(
         require(config.halfOpenMaxCalls >= 1) {
             "halfOpenMaxCalls must be >= 1, got ${config.halfOpenMaxCalls}"
         }
+        config.slidingWindow?.let { w ->
+            require(w.isPositive()) {
+                "slidingWindow must be positive when set, got $w"
+            }
+        }
     }
+
+    /** When non-null, CLOSED failures are tracked in a time sliding window (ms). */
+    private val slidingWindowMs: Long? =
+        config.slidingWindow?.takeIf { it.isPositive() }?.inWholeMilliseconds
+
+    private val failureTimestamps = ArrayDeque<Long>()
 
     private val mutex = Mutex()
     private val _state = MutableStateFlow(CircuitState.CLOSED)
@@ -255,7 +267,12 @@ class DefaultCircuitBreaker(
         mutex.withLock {
             when (_state.value) {
                 CircuitState.CLOSED -> {
-                    failureCount = 0
+                    if (slidingWindowMs != null) {
+                        val now = getTimeMillis()
+                        pruneFailureTimestampsLocked(now)
+                    } else {
+                        failureCount = 0
+                    }
                 }
 
                 CircuitState.OPEN -> {
@@ -268,6 +285,7 @@ class DefaultCircuitBreaker(
                         transitionTo(CircuitState.CLOSED)
                         successCount = 0
                         failureCount = 0
+                        failureTimestamps.clear()
                     }
                 }
             }
@@ -280,9 +298,19 @@ class DefaultCircuitBreaker(
         mutex.withLock {
             when (_state.value) {
                 CircuitState.CLOSED -> {
-                    failureCount++
-                    if (failureCount >= config.failureThreshold) {
-                        transitionOpenFor(config.timeout)
+                    if (slidingWindowMs != null) {
+                        val now = getTimeMillis()
+                        pruneFailureTimestampsLocked(now)
+                        failureTimestamps.addLast(now)
+                        pruneFailureTimestampsLocked(now)
+                        if (failureTimestamps.size >= config.failureThreshold) {
+                            transitionOpenFor(config.timeout)
+                        }
+                    } else {
+                        failureCount++
+                        if (failureCount >= config.failureThreshold) {
+                            transitionOpenFor(config.timeout)
+                        }
                     }
                 }
 
@@ -304,7 +332,20 @@ class DefaultCircuitBreaker(
         // Ensure we add at least 1ms to avoid immediate timeout
         openUntilMs = now + max(1, durationMs)
         successCount = 0
+        if (slidingWindowMs != null) {
+            failureTimestamps.clear()
+        }
         transitionTo(CircuitState.OPEN)
+    }
+
+    /** Must be called with [mutex] held. Updates [failureCount] to the number of timestamps in the window. */
+    private fun pruneFailureTimestampsLocked(now: Long) {
+        val windowMs = slidingWindowMs ?: return
+        val cutoff = now - windowMs
+        while (failureTimestamps.isNotEmpty() && failureTimestamps.first() < cutoff) {
+            failureTimestamps.removeFirst()
+        }
+        failureCount = failureTimestamps.size
     }
 
     private fun getTimeMillis(): Long {

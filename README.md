@@ -122,13 +122,16 @@ Supported backoffs: `ExponentialBackoff`, `LinearBackoff`, `FixedBackoff`.
 
 ### Circuit Breaker
 Prevents hammering failing downstreams. States: CLOSED → OPEN → HALF_OPEN.
+
+By default, **`failureThreshold`** counts **consecutive** failures in CLOSED (a success resets the count). Set **`slidingWindow`** to a positive duration to open when **`failureThreshold`** failures fall **within that time window** (not necessarily consecutive); successes only prune expired timestamps from the window.
 ```kotlin
-val policy = resilient {
+val policy = resilient(scope) {
     circuitBreaker {
         failureThreshold = 5
         successThreshold = 2
         halfOpenMaxCalls = 1
         timeout = 60.seconds // OPEN duration
+        slidingWindow = 30.seconds // optional: time-based failure window
     }
 }
 ```
@@ -149,11 +152,30 @@ val policy = resilient {
 ### Bulkhead
 Limit concurrent executions and queued waiters; optional acquire timeout.
 ```kotlin
-val policy = resilient {
+val policy = resilient(scope) {
     bulkhead {
         maxConcurrentCalls = 8
         maxWaitingCalls = 32
         timeout = 2.seconds
+    }
+}
+```
+
+**Named / shared bulkhead:** use `BulkheadRegistry` so several policies share the same pool (e.g. one limit for all `"database"` calls). Cannot combine `bulkhead { }` and `bulkheadNamed(...)` in the same policy.
+```kotlin
+import com.santimattius.resilient.bulkhead.BulkheadRegistry
+
+val bulkheads = BulkheadRegistry()
+
+val policyA = resilient(scope) {
+    bulkheadNamed(bulkheads, "database") {
+        maxConcurrentCalls = 4
+        maxWaitingCalls = 16
+    }
+}
+val policyB = resilient(scope) {
+    bulkheadNamed(bulkheads, "database") {
+        maxConcurrentCalls = 4 // first registration wins; same instance as policyA
     }
 }
 ```
