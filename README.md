@@ -45,7 +45,7 @@ val job = scope.launch {
 
 ## Composition Order
 Outer → Inner (default):
-- Fallback → Cache → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → Block
+- Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → Block
 - Fallback wraps outermost to handle failures after all policies.
 
 ### Custom Composition Order
@@ -57,6 +57,7 @@ import com.santimattius.resilient.composition.OrderablePolicyType
 val policy = resilient(scope) {
     compositionOrder(listOf(
         OrderablePolicyType.CACHE,        // Check cache first (after Fallback)
+        OrderablePolicyType.COALESCE,     // Deduplicate in-flight requests by key
         OrderablePolicyType.TIMEOUT,      // Then apply timeout
         OrderablePolicyType.RETRY,        // Retry on failures
         OrderablePolicyType.CIRCUIT_BREAKER,
@@ -71,7 +72,8 @@ val policy = resilient(scope) {
 
 **Important Notes:**
 - **Fallback is not included** in `OrderablePolicyType` - it is always positioned outermost automatically
-- All orderable policy types (7 total) must be included in the custom order exactly once
+- `compositionOrder(...)` accepts a subset: policy types not included are appended in the default order
+- Duplicates are removed
 - Fallback must remain outermost to catch all failures from other policies
 - The order affects how policies interact with each other, so choose carefully based on your use case
 
@@ -180,6 +182,17 @@ policy.cacheHandle?.invalidate("users:123")
 policy.cacheHandle?.invalidatePrefix("user:")
 ```
 The in-memory implementation is one possible `CachePolicy`; custom backends (e.g. persistent storage or Redis) can implement the same interface.
+
+### Coalescing (Request Deduplication)
+Deduplicates **concurrent in-flight** executions by key. If multiple callers resolve the same key while the operation is still running, only one block execution happens and all callers share the same result (or error). It does **not** cache completed results; for TTL caching, use `cache { ... }`.
+```kotlin
+val policy = resilient(scope) {
+    coalesce {
+        key = "profile:42" // fixed key
+        // or keyProvider = { "profile:${userId}" } // dynamic key
+    }
+}
+```
 
 ### Health / Readiness
 Use `policy.getHealthSnapshot()` to build health or readiness endpoints (e.g. Kubernetes probes, `/health` API). The snapshot includes circuit breaker state and counters, and bulkhead usage when configured.

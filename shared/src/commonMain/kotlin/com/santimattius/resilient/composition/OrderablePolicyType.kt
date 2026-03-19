@@ -9,6 +9,8 @@ package com.santimattius.resilient.composition
 enum class OrderablePolicyType {
     /** Cache policy: returns cached result when available. */
     CACHE,
+    /** Coalescing policy: deduplicates concurrent in-flight requests by key. */
+    COALESCE,
     /** Timeout policy: cancels execution after a maximum duration. */
     TIMEOUT,
     /** Retry policy: retries the operation on failure. */

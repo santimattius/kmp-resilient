@@ -10,6 +10,8 @@ internal enum class PolicyType {
     FALLBACK,
     /** Cache: returns cached result when available. */
     CACHE,
+    /** Coalescing: deduplicates concurrent in-flight requests by key. */
+    COALESCE,
     /** Timeout: cancels after max duration. */
     TIMEOUT,
     /** Retry: retries on failure. */

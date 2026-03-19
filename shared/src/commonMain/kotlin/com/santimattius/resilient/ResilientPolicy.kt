@@ -31,13 +31,14 @@ data class PolicyHealthSnapshot(
  * The execution pipeline follows this sequence (from outermost to innermost):
  * 1.  **Fallback**: Provides an alternative result if the entire pipeline fails.
  * 2.  **Cache**: Returns a cached result if available, bypassing the rest of the pipeline.
- * 3.  **Timeout**: Enforces a total time limit for the operation, including all retries.
- * 4.  **Retry**: Re-executes the operation upon specific failures.
- * 5.  **Circuit Breaker**: Halts execution temporarily if failure rates exceed a threshold.
- * 6.  **Rate Limiter**: Controls the frequency of executions.
- * 7.  **Bulkhead**: Limits the number of concurrent executions.
- * 8.  **Hedging**: Executes secondary operations in parallel if the primary is slow.
- * 9.  **User's Code Block**: The actual suspendable operation to be executed.
+ * 3.  **Coalescing**: Deduplicates concurrent in-flight executions by key.
+ * 4.  **Timeout**: Enforces a total time limit for the operation, including all retries.
+ * 5.  **Retry**: Re-executes the operation upon specific failures.
+ * 6.  **Circuit Breaker**: Halts execution temporarily if failure rates exceed a threshold.
+ * 7.  **Rate Limiter**: Controls the frequency of executions.
+ * 8.  **Bulkhead**: Limits the number of concurrent executions.
+ * 9.  **Hedging**: Executes secondary operations in parallel if the primary is slow.
+ * 10. **User's Code Block**: The actual suspendable operation to be executed.
  *
  * Telemetry events are emitted throughout the execution, providing insights into the behavior of each strategy.
  *

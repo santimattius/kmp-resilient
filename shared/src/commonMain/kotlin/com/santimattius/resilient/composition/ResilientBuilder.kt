@@ -2,6 +2,8 @@ package com.santimattius.resilient.composition
 
 import com.santimattius.resilient.ResilientPolicy
 import com.santimattius.resilient.annotations.ResilientExperimentalApi
+import com.santimattius.resilient.coalescing.CoalesceConfig
+import com.santimattius.resilient.coalescing.DefaultCoalescingPolicy
 import com.santimattius.resilient.bulkhead.BulkheadConfig
 import com.santimattius.resilient.bulkhead.DefaultBulkhead
 import com.santimattius.resilient.cache.CacheConfig
@@ -74,6 +76,7 @@ class ResilientBuilder {
     internal var bulkheadConfig: BulkheadConfig? = null
     internal var timeoutConfig: TimeoutConfig? = null
     internal var cacheConfig: CacheConfig? = null
+    internal var coalesceConfig: CoalesceConfig? = null
     internal var fallbackConfig: FallbackConfig<Any?>? = null
     internal var hedgingConfig: HedgingConfig? = null
     internal var compositionOrder: CompositionOrder = CompositionOrder.DEFAULT
@@ -125,6 +128,18 @@ class ResilientBuilder {
      */
     fun cache(config: CacheConfig.() -> Unit) {
         cacheConfig = (cacheConfig ?: CacheConfig()).apply(config)
+    }
+
+    /**
+     * Configures request coalescing.
+     *
+     * Concurrent executions that resolve to the same key will share a single in-flight
+     * execution and all callers will receive the same result (or error).
+     *
+     * This policy does not cache completed results.
+     */
+    fun coalesce(config: CoalesceConfig.() -> Unit) {
+        coalesceConfig = (coalesceConfig ?: CoalesceConfig()).apply(config)
     }
 
     /**
@@ -190,17 +205,18 @@ class ResilientBuilder {
  * Default Execution Order (from outer to inner):
  * 1. `fallback`
  * 2. `cache`
- * 3. `timeout`
- * 4. `retry`
- * 5. `circuitBreaker`
- * 6. `rateLimiter`
- * 7. `bulkhead`
- * 8. `hedging`
+ * 3. `coalesce`
+ * 4. `timeout`
+ * 5. `retry`
+ * 6. `circuitBreaker`
+ * 7. `rateLimiter`
+ * 8. `bulkhead`
+ * 9. `hedging`
  *
- * This means a request will first pass through the `fallback` and `cache` policies, then `timeout`, and so on, until it reaches the core execution block, which is wrapped by the `hedging` policy.
+ * This means a request will first pass through the `fallback`, then `cache`, then `coalesce`, and then `timeout`, and so on, until it reaches the core execution block, which is wrapped by the `hedging` policy.
  * The `fallback` policy is the last line of defense, catching any exceptions that bubble up through all other policies.
  *
- * Example: `fallback` -> `cache` -> `timeout` -> `retry` -> `...` -> `hedging` -> `block()`
+ * Example: `fallback` -> `cache` -> `coalesce` -> `timeout` -> `retry` -> `...` -> `hedging` -> `block()`
  *
  * The composition order can be customized using [ResilientBuilder.compositionOrder]. This allows you to
  * change the order in which policies are applied, which can be useful for specific use cases or performance tuning.
@@ -287,6 +303,10 @@ fun resilient(
             events.tryEmit(ResilientEvent.HedgingUsed(attemptIndex))
         }
     }
+
+    val coalescing = builder.coalesceConfig?.let { cfg ->
+        DefaultCoalescingPolicy(cfg, resilientScope)
+    }
     val fallback = builder.fallbackConfig?.let { cfg ->
         FallbackPolicy(cfg) { t ->
             events.tryEmit(ResilientEvent.FallbackTriggered(t))
@@ -310,6 +330,7 @@ fun resilient(
             return try {
                 val composed = compose(
                     cache = cache,
+                    coalescing = coalescing,
                     timeout = timeoutPolicy,
                     retry = retry,
                     circuitBreaker = circuitBreaker,
@@ -335,6 +356,7 @@ fun resilient(
 
         private fun <T> compose(
             cache: InMemoryCachePolicy?,
+            coalescing: DefaultCoalescingPolicy?,
             timeout: DefaultTimeoutPolicy?,
             retry: DefaultRetryPolicy?,
             circuitBreaker: DefaultCircuitBreaker?,
@@ -355,6 +377,10 @@ fun resilient(
                         }
 
                         PolicyType.CACHE -> cache?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
+
+                        PolicyType.COALESCE -> coalescing?.let { policy ->
                             { next: Execute<T> -> suspend { policy.execute { next() } } }
                         }
 
@@ -391,6 +417,7 @@ fun resilient(
                     if (circuitBreaker != null) add { next -> { circuitBreaker.execute { next() } } }
                     if (retry != null) add { next -> { retry.execute { next() } } }
                     if (timeout != null) add { next -> { timeout.execute { next() } } }
+                    if (coalescing != null) add { next -> { coalescing.execute { next() } } }
                     if (cache != null) add { next -> { cache.execute { next() } } }
                     if (fallback != null) add { next -> { fallback.execute { next() } } }
                 }
