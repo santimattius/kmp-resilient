@@ -5,6 +5,7 @@ import com.santimattius.resilient.annotations.ResilientExperimentalApi
 import com.santimattius.resilient.coalescing.CoalesceConfig
 import com.santimattius.resilient.coalescing.DefaultCoalescingPolicy
 import com.santimattius.resilient.bulkhead.BulkheadConfig
+import com.santimattius.resilient.bulkhead.BulkheadRegistry
 import com.santimattius.resilient.bulkhead.DefaultBulkhead
 import com.santimattius.resilient.cache.CacheConfig
 import com.santimattius.resilient.cache.CacheHandle
@@ -33,6 +34,15 @@ import kotlin.time.TimeSource
  * Used internally when composing resilience policy wrappers.
  */
 typealias Execute<T> = suspend () -> T
+
+/**
+ * Named bulkhead request: resolved at [resilient] build time via [BulkheadRegistry.getOrCreate].
+ */
+internal data class BulkheadNamedSpec(
+    val registry: BulkheadRegistry,
+    val name: String,
+    val configure: BulkheadConfig.() -> Unit
+)
 
 /**
  * A DSL builder for creating and configuring a composition of resilience policies.
@@ -74,6 +84,7 @@ class ResilientBuilder {
     internal var circuitBreakerConfig: CircuitBreakerConfig? = null
     internal var rateLimiterConfig: RateLimiterConfig? = null
     internal var bulkheadConfig: BulkheadConfig? = null
+    internal var bulkheadNamedSpec: BulkheadNamedSpec? = null
     internal var timeoutConfig: TimeoutConfig? = null
     internal var cacheConfig: CacheConfig? = null
     internal var coalesceConfig: CoalesceConfig? = null
@@ -111,7 +122,27 @@ class ResilientBuilder {
      * @param config Lambda to configure [BulkheadConfig] (e.g. maxConcurrentCalls, maxWaitingCalls).
      */
     fun bulkhead(config: BulkheadConfig.() -> Unit) {
+        require(bulkheadNamedSpec == null) {
+            "Cannot use bulkhead { } together with bulkheadNamed(...); choose one."
+        }
         bulkheadConfig = (bulkheadConfig ?: BulkheadConfig()).apply(config)
+    }
+
+    /**
+     * Uses a shared [DefaultBulkhead] from [registry] keyed by [name].
+     * Multiple policies can pass the same [BulkheadRegistry] and name to enforce a **global** limit
+     * across those policies.
+     *
+     * Cannot be combined with [bulkhead] in the same builder.
+     */
+    fun bulkheadNamed(registry: BulkheadRegistry, name: String, config: BulkheadConfig.() -> Unit) {
+        require(bulkheadConfig == null) {
+            "Cannot use bulkheadNamed(...) together with bulkhead { }; choose one."
+        }
+        require(bulkheadNamedSpec == null) {
+            "bulkheadNamed(...) can only be configured once per policy."
+        }
+        bulkheadNamedSpec = BulkheadNamedSpec(registry, name, config)
     }
 
     /**
@@ -278,6 +309,7 @@ fun resilient(
             timeout = cfg.timeout
             halfOpenMaxCalls = cfg.halfOpenMaxCalls
             shouldRecordFailure = cfg.shouldRecordFailure
+            slidingWindow = cfg.slidingWindow
             onStateChange = { state -> cfg.onStateChange(state) }
         }
         DefaultCircuitBreaker(copy) { new, old ->
@@ -294,7 +326,11 @@ fun resilient(
         )
     }
 
-    val bulkhead = builder.bulkheadConfig?.let { cfg ->
+    val bulkhead = builder.bulkheadNamedSpec?.let { spec ->
+        spec.registry.getOrCreate(spec.name, spec.configure) { reason ->
+            events.tryEmit(ResilientEvent.BulkheadRejected(reason))
+        }
+    } ?: builder.bulkheadConfig?.let { cfg ->
         DefaultBulkhead(cfg) { reason ->
             events.tryEmit(ResilientEvent.BulkheadRejected(reason))
         }
