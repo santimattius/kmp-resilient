@@ -16,8 +16,10 @@ interface RetryPolicy {
      * Executes [block] and retries on failure according to the policy configuration.
      * @param T The return type of the block.
      * @param block The suspendable operation to execute and optionally retry.
-     * @return The result of [block] when it succeeds.
-     * @throws Throwable The last exception if all attempts fail, or if [block] throws and retry is not applicable.
+     * @return The result of [block] when it succeeds and any configured result predicate accepts it,
+     *   or the **last returned value** if [RetryPolicyConfig.shouldRetryResult] keeps requesting retries until
+     *   [RetryPolicyConfig.maxAttempts] is reached.
+     * @throws Throwable The last exception if all attempts fail with a thrown error, or if [block] throws and retry is not applicable.
      */
     suspend fun <T> execute(block: suspend () -> T): T
 }
@@ -43,6 +45,12 @@ interface RetryPolicy {
  *   (e.g. [kotlinx.coroutines.TimeoutCancellationException] is typically retryable).
  *   Use this when you want a timeout per attempt rather than a single global timeout from a [TimeoutPolicy].
  *   Defaults to `null` (no per-attempt timeout).
+ * @property shouldRetryResult Optional predicate run after [block] completes **without** throwing.
+ *   Return `true` to treat the outcome as needing another attempt (same [maxAttempts] budget as exception retries).
+ *   Return `false` to accept the value. Default is `null` (only [shouldRetry] applies).
+ *   When `true`, [onRetry] is invoked with [RetryableResultException] (see [RetryableResultException.lastValue]).
+ *   If [maxAttempts] is exhausted while the predicate keeps returning `true`, the **last returned value** is returned
+ *   (unlike exception exhaustion, which rethrows the last [Throwable]).
  */
 class RetryPolicyConfig {
     var maxAttempts: Int = 3
@@ -50,7 +58,23 @@ class RetryPolicyConfig {
     var shouldRetry: (Throwable) -> Boolean = { true }
     var onRetry: suspend (attempt: Int, error: Throwable) -> Unit = { _, _ -> }
     var perAttemptTimeout: Duration? = null
+    var shouldRetryResult: ((Any?) -> Boolean)? = null
 }
+
+/**
+ * Passed to [RetryPolicyConfig.onRetry] (and emitted as [com.santimattius.resilient.telemetry.ResilientEvent.RetryAttempt])
+ * when a retry is triggered by [RetryPolicyConfig.shouldRetryResult], not by an exception from [block].
+ *
+ * This type is **not** thrown to the caller of [DefaultRetryPolicy.execute] when retries are exhausted by result;
+ * in that case the last value is returned. It is only used as the [Throwable] argument for [RetryPolicyConfig.onRetry]
+ * and for observability.
+ *
+ * @property lastValue The successful return value that caused [RetryPolicyConfig.shouldRetryResult] to return `true`.
+ */
+class RetryableResultException(
+    message: String = "Retry requested by shouldRetryResult",
+    val lastValue: Any? = null
+) : Exception(message)
 
 /**
  * Strategy for computing the delay before the next retry attempt.

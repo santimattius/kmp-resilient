@@ -98,6 +98,8 @@ val policy = resilient {
 
 ### Retry
 Retries failing operations according to a backoff strategy and predicate. Use **shouldRetry** to avoid retrying non-transient errors (e.g. 4xx client errors); retry only on 5xx, network/IO, or timeouts. Optional **perAttemptTimeout** limits each attempt (including the first) so a single slow attempt does not consume the whole retry budget.
+
+Optional **shouldRetryResult** retries when the block returns successfully but the value is not acceptable (e.g. HTTP 202, empty body, “not ready” flag). Return `true` from the predicate to request another attempt; it shares the same **maxAttempts** budget as exception-based retries. **`onRetry`** receives `RetryableResultException` (with `lastValue`) for telemetry; if attempts are exhausted while the predicate stays `true`, the **last returned value** is returned (unlike exception exhaustion, which rethrows).
 ```kotlin
 import com.santimattius.resilient.retry.*
 
@@ -105,6 +107,7 @@ val policy = resilient {
     retry {
         maxAttempts = 4
         shouldRetry = { it is java.io.IOException }  // e.g. only retry IO; do not retry 4xx
+        shouldRetryResult = { status -> (status as Int) >= 500 } // e.g. retry on 5xx-like codes returned as value
         perAttemptTimeout = 5.seconds               // optional: timeout per attempt
         backoffStrategy = ExponentialBackoff(
             initialDelay = 200.milliseconds,

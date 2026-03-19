@@ -15,9 +15,12 @@ import kotlin.time.Duration.Companion.seconds
  *
  * This class orchestrates the execution of a code block with retry logic based on the provided
  * [RetryPolicyConfig]. It will attempt to execute the block up to `maxAttempts` times.
- * If an exception occurs, it consults the `shouldRetry` predicate and, if a retry is warranted,
- * it calls `onRetry`, waits for a duration determined by the `backoffStrategy`, and then tries again.
- * If all attempts fail, the last caught exception is rethrown.
+ * If an exception occurs, it consults [RetryPolicyConfig.shouldRetry] and, if a retry is warranted,
+ * it calls [RetryPolicyConfig.onRetry], waits per [RetryPolicyConfig.backoffStrategy], and tries again.
+ * If [block] completes successfully and [RetryPolicyConfig.shouldRetryResult] returns `true`, the same retry
+ * path is used (with [RetryableResultException] passed to [RetryPolicyConfig.onRetry]).
+ * If all attempts fail with exceptions, the last caught exception is rethrown.
+ * If attempts are exhausted due to [RetryPolicyConfig.shouldRetryResult], the last returned value is returned.
  *
  * @param config The configuration that defines the retry behavior, including the number of attempts,
  *               the backoff strategy, and conditions for retrying.
@@ -38,13 +41,27 @@ class DefaultRetryPolicy(
         var lastError: Throwable? = null
         var attempt = 0
         val timeout = config.perAttemptTimeout
+        val shouldRetryResult = config.shouldRetryResult
         while (attempt < config.maxAttempts) {
             try {
-                return if (timeout != null && timeout.isPositive()) {
+                val result = if (timeout != null && timeout.isPositive()) {
                     withTimeout(timeout.inWholeMilliseconds) { block() }
                 } else {
                     block()
                 }
+
+                if (shouldRetryResult == null || !shouldRetryResult(result as Any?)) {
+                    return result
+                }
+
+                val synthetic = RetryableResultException(lastValue = result as Any?)
+                lastError = synthetic
+                attempt++
+                if (attempt >= config.maxAttempts) {
+                    return result
+                }
+                config.onRetry(attempt, synthetic)
+                config.backoffStrategy.delay(attempt)
             } catch (e: Throwable) {
                 if (e is CancellationException && e !is TimeoutCancellationException) throw e
                 if (!config.shouldRetry(e)) throw e
