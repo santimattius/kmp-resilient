@@ -260,6 +260,7 @@ fun resilient(
             maxAttempts = cfg.maxAttempts
             backoffStrategy = cfg.backoffStrategy
             shouldRetry = cfg.shouldRetry
+            shouldRetryResult = cfg.shouldRetryResult
             perAttemptTimeout = cfg.perAttemptTimeout
             onRetry = { attempt, error ->
                 events.emit(ResilientEvent.RetryAttempt(attempt, error))
