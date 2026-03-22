@@ -7,9 +7,6 @@ plugins {
     alias(libs.plugins.mavenPublish)
 }
 
-group = "io.github.santimattius.resilient"
-version = "1.3.0"
-
 kotlin {
     androidLibrary {
         namespace = "io.github.santimattius.resilient.test"
@@ -69,5 +66,10 @@ kotlin {
     }
 }
 
-extra["resilientMavenArtifactId"] = "resilient-test"
-apply(from = rootProject.file("gradle/resilient-maven-publishing.gradle"))
+mavenPublishing {
+    coordinates(
+        groupId = project.group.toString(),
+        artifactId = "resilient-test",
+        version = project.version.toString()
+    )
+}
