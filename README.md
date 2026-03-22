@@ -287,7 +287,112 @@ setContent { ResilientExample() }
 - Cache only idempotent reads; set TTL appropriately.
 - Always observe telemetry (including CacheHit/CacheMiss, FallbackTriggered) for visibility and tuning.
 
+## Testing with `resilient-test`
+
+The `resilient-test` module provides utilities for testing resilience policies with fault injection and simplified policy builders.
+
+### Fault Injection
+
+Use `FaultInjector` to simulate failures, delays, and intermittent behavior in your tests:
+
+```kotlin
+import com.santimattius.resilient.test.FaultInjector
+import kotlin.time.Duration.Companion.milliseconds
+
+val injector = FaultInjector.builder()
+    .failureRate(0.3)           // 30% chance of failure
+    .delay(50.milliseconds)      // Add 50ms delay
+    .delayJitter(true)           // Randomize delay ±20%
+    .exception { CustomException() }  // Custom exception
+    .build()
+
+val result = injector.execute {
+    fetchData() // may throw or delay
+}
+```
+
+**Configuration:**
+- `failureRate(rate: Double)`: Probability of throwing an exception (0.0 = never, 1.0 = always).
+- `exception(block: () -> Throwable)`: Factory for the exception to throw (default: `FaultInjectedException`).
+- `delay(duration: Duration)`: Fixed delay before executing the block (default: `Duration.ZERO`).
+- `delayJitter(enable: Boolean)`: Randomize delay ±20% (default: `false`).
+
+### Policy Builders for Tests
+
+Use `PolicyBuilders` to create policies with sensible test defaults:
+
+```kotlin
+import com.santimattius.resilient.test.PolicyBuilders
+import com.santimattius.resilient.test.TestResilientScope
+import kotlinx.coroutines.test.runTest
+
+@Test
+fun `test retry with fault injection`() = runTest {
+    val scope = TestResilientScope(this)
+    val policy = PolicyBuilders.retryPolicy(
+        scope,
+        maxAttempts = 3,
+        initialDelay = 10.milliseconds
+    )
+    
+    val injector = FaultInjector.builder()
+        .failureRate(0.5)
+        .build()
+    
+    val result = policy.execute {
+        injector.execute { "success" }
+    }
+    
+    assertEquals("success", result)
+}
+```
+
+**Available builders:**
+- `retryPolicy(scope, maxAttempts = 3, initialDelay = 10ms, maxDelay = 100ms, shouldRetry = { true })`
+- `timeoutPolicy(scope, timeout = 1.second)`
+- `circuitBreakerPolicy(scope, failureThreshold = 3, successThreshold = 2, timeout = 5.seconds)`
+- `bulkheadPolicy(scope, maxConcurrentCalls = 2, maxWaitingCalls = 4)`
+- `rateLimiterPolicy(scope, maxCalls = 5, period = 1.second)`
+
+### TestResilientScope
+
+Use `TestResilientScope` to create a test-friendly scope for policies:
+
+```kotlin
+import com.santimattius.resilient.test.TestResilientScope
+import kotlinx.coroutines.test.runTest
+
+@Test
+fun `test policy lifecycle`() = runTest {
+    val scope = TestResilientScope(this)
+    val policy = resilient(scope) {
+        retry { maxAttempts = 3 }
+    }
+    
+    // ... test logic
+    
+    scope.cancel() // cleanup
+}
+```
+
+### Gradle Dependency
+
+Add the `resilient-test` module to your test dependencies:
+
+```kotlin
+// build.gradle.kts
+kotlin {
+    sourceSets {
+        commonTest.dependencies {
+            implementation("io.github.santimattius.resilient:resilient-test:1.3.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+        }
+    }
+}
+```
+
 ## Testing Notes
-- Use kotlinx-coroutines-test for virtual time.
+- Use `kotlinx-coroutines-test` for virtual time with `runTest` and `TestTimeSource`.
+- Use `FaultInjector` to simulate realistic failure scenarios (intermittent errors, slow responses).
 - Verify: retry attempts and delays, CB transitions, RL windows, BH limits, composition order, cancellation propagation, telemetry.
 

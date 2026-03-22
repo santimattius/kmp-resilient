@@ -6,12 +6,12 @@ android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
 
-composeBom = "2026.02.00"
+composeBom = "2026.03.00"
 androidx-lifecycle = "2.10.0"
 
-androidx-activity = "1.12.4"
+androidx-activity = "1.13.0"
 androidx-appcompat = "1.7.1"
-androidx-core = "1.17.0"
+androidx-core = "1.18.0"
 
 androidx-espresso = "3.7.0"
 androidx-testExt = "1.3.0"
