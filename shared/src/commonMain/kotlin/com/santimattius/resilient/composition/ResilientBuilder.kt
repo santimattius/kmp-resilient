@@ -2,7 +2,10 @@ package com.santimattius.resilient.composition
 
 import com.santimattius.resilient.ResilientPolicy
 import com.santimattius.resilient.annotations.ResilientExperimentalApi
+import com.santimattius.resilient.coalescing.CoalesceConfig
+import com.santimattius.resilient.coalescing.DefaultCoalescingPolicy
 import com.santimattius.resilient.bulkhead.BulkheadConfig
+import com.santimattius.resilient.bulkhead.BulkheadRegistry
 import com.santimattius.resilient.bulkhead.DefaultBulkhead
 import com.santimattius.resilient.cache.CacheConfig
 import com.santimattius.resilient.cache.CacheHandle
@@ -31,6 +34,15 @@ import kotlin.time.TimeSource
  * Used internally when composing resilience policy wrappers.
  */
 typealias Execute<T> = suspend () -> T
+
+/**
+ * Named bulkhead request: resolved at [resilient] build time via [BulkheadRegistry.getOrCreate].
+ */
+internal data class BulkheadNamedSpec(
+    val registry: BulkheadRegistry,
+    val name: String,
+    val configure: BulkheadConfig.() -> Unit
+)
 
 /**
  * A DSL builder for creating and configuring a composition of resilience policies.
@@ -72,8 +84,10 @@ class ResilientBuilder {
     internal var circuitBreakerConfig: CircuitBreakerConfig? = null
     internal var rateLimiterConfig: RateLimiterConfig? = null
     internal var bulkheadConfig: BulkheadConfig? = null
+    internal var bulkheadNamedSpec: BulkheadNamedSpec? = null
     internal var timeoutConfig: TimeoutConfig? = null
     internal var cacheConfig: CacheConfig? = null
+    internal var coalesceConfig: CoalesceConfig? = null
     internal var fallbackConfig: FallbackConfig<Any?>? = null
     internal var hedgingConfig: HedgingConfig? = null
     internal var compositionOrder: CompositionOrder = CompositionOrder.DEFAULT
@@ -108,7 +122,27 @@ class ResilientBuilder {
      * @param config Lambda to configure [BulkheadConfig] (e.g. maxConcurrentCalls, maxWaitingCalls).
      */
     fun bulkhead(config: BulkheadConfig.() -> Unit) {
+        require(bulkheadNamedSpec == null) {
+            "Cannot use bulkhead { } together with bulkheadNamed(...); choose one."
+        }
         bulkheadConfig = (bulkheadConfig ?: BulkheadConfig()).apply(config)
+    }
+
+    /**
+     * Uses a shared [DefaultBulkhead] from [registry] keyed by [name].
+     * Multiple policies can pass the same [BulkheadRegistry] and name to enforce a **global** limit
+     * across those policies.
+     *
+     * Cannot be combined with [bulkhead] in the same builder.
+     */
+    fun bulkheadNamed(registry: BulkheadRegistry, name: String, config: BulkheadConfig.() -> Unit) {
+        require(bulkheadConfig == null) {
+            "Cannot use bulkheadNamed(...) together with bulkhead { }; choose one."
+        }
+        require(bulkheadNamedSpec == null) {
+            "bulkheadNamed(...) can only be configured once per policy."
+        }
+        bulkheadNamedSpec = BulkheadNamedSpec(registry, name, config)
     }
 
     /**
@@ -125,6 +159,18 @@ class ResilientBuilder {
      */
     fun cache(config: CacheConfig.() -> Unit) {
         cacheConfig = (cacheConfig ?: CacheConfig()).apply(config)
+    }
+
+    /**
+     * Configures request coalescing.
+     *
+     * Concurrent executions that resolve to the same key will share a single in-flight
+     * execution and all callers will receive the same result (or error).
+     *
+     * This policy does not cache completed results.
+     */
+    fun coalesce(config: CoalesceConfig.() -> Unit) {
+        coalesceConfig = (coalesceConfig ?: CoalesceConfig()).apply(config)
     }
 
     /**
@@ -190,17 +236,18 @@ class ResilientBuilder {
  * Default Execution Order (from outer to inner):
  * 1. `fallback`
  * 2. `cache`
- * 3. `timeout`
- * 4. `retry`
- * 5. `circuitBreaker`
- * 6. `rateLimiter`
- * 7. `bulkhead`
- * 8. `hedging`
+ * 3. `coalesce`
+ * 4. `timeout`
+ * 5. `retry`
+ * 6. `circuitBreaker`
+ * 7. `rateLimiter`
+ * 8. `bulkhead`
+ * 9. `hedging`
  *
- * This means a request will first pass through the `fallback` and `cache` policies, then `timeout`, and so on, until it reaches the core execution block, which is wrapped by the `hedging` policy.
+ * This means a request will first pass through the `fallback`, then `cache`, then `coalesce`, and then `timeout`, and so on, until it reaches the core execution block, which is wrapped by the `hedging` policy.
  * The `fallback` policy is the last line of defense, catching any exceptions that bubble up through all other policies.
  *
- * Example: `fallback` -> `cache` -> `timeout` -> `retry` -> `...` -> `hedging` -> `block()`
+ * Example: `fallback` -> `cache` -> `coalesce` -> `timeout` -> `retry` -> `...` -> `hedging` -> `block()`
  *
  * The composition order can be customized using [ResilientBuilder.compositionOrder]. This allows you to
  * change the order in which policies are applied, which can be useful for specific use cases or performance tuning.
@@ -244,6 +291,7 @@ fun resilient(
             maxAttempts = cfg.maxAttempts
             backoffStrategy = cfg.backoffStrategy
             shouldRetry = cfg.shouldRetry
+            shouldRetryResult = cfg.shouldRetryResult
             perAttemptTimeout = cfg.perAttemptTimeout
             onRetry = { attempt, error ->
                 events.emit(ResilientEvent.RetryAttempt(attempt, error))
@@ -261,6 +309,7 @@ fun resilient(
             timeout = cfg.timeout
             halfOpenMaxCalls = cfg.halfOpenMaxCalls
             shouldRecordFailure = cfg.shouldRecordFailure
+            slidingWindow = cfg.slidingWindow
             onStateChange = { state -> cfg.onStateChange(state) }
         }
         DefaultCircuitBreaker(copy) { new, old ->
@@ -277,7 +326,11 @@ fun resilient(
         )
     }
 
-    val bulkhead = builder.bulkheadConfig?.let { cfg ->
+    val bulkhead = builder.bulkheadNamedSpec?.let { spec ->
+        spec.registry.getOrCreate(spec.name, spec.configure) { reason ->
+            events.tryEmit(ResilientEvent.BulkheadRejected(reason))
+        }
+    } ?: builder.bulkheadConfig?.let { cfg ->
         DefaultBulkhead(cfg) { reason ->
             events.tryEmit(ResilientEvent.BulkheadRejected(reason))
         }
@@ -286,6 +339,10 @@ fun resilient(
         DefaultHedgingPolicy(cfg) { attemptIndex ->
             events.tryEmit(ResilientEvent.HedgingUsed(attemptIndex))
         }
+    }
+
+    val coalescing = builder.coalesceConfig?.let { cfg ->
+        DefaultCoalescingPolicy(cfg, resilientScope)
     }
     val fallback = builder.fallbackConfig?.let { cfg ->
         FallbackPolicy(cfg) { t ->
@@ -310,6 +367,7 @@ fun resilient(
             return try {
                 val composed = compose(
                     cache = cache,
+                    coalescing = coalescing,
                     timeout = timeoutPolicy,
                     retry = retry,
                     circuitBreaker = circuitBreaker,
@@ -335,6 +393,7 @@ fun resilient(
 
         private fun <T> compose(
             cache: InMemoryCachePolicy?,
+            coalescing: DefaultCoalescingPolicy?,
             timeout: DefaultTimeoutPolicy?,
             retry: DefaultRetryPolicy?,
             circuitBreaker: DefaultCircuitBreaker?,
@@ -355,6 +414,10 @@ fun resilient(
                         }
 
                         PolicyType.CACHE -> cache?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
+
+                        PolicyType.COALESCE -> coalescing?.let { policy ->
                             { next: Execute<T> -> suspend { policy.execute { next() } } }
                         }
 
@@ -391,6 +454,7 @@ fun resilient(
                     if (circuitBreaker != null) add { next -> { circuitBreaker.execute { next() } } }
                     if (retry != null) add { next -> { retry.execute { next() } } }
                     if (timeout != null) add { next -> { timeout.execute { next() } } }
+                    if (coalescing != null) add { next -> { coalescing.execute { next() } } }
                     if (cache != null) add { next -> { cache.execute { next() } } }
                     if (fallback != null) add { next -> { fallback.execute { next() } } }
                 }

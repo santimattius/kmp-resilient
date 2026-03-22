@@ -12,8 +12,9 @@ import kotlin.time.Duration.Companion.seconds
  * repeated calls to a failing service.
  *
  * It operates in three states:
- * - **[CLOSED][CircuitState.CLOSED]**: All calls are allowed to pass through. If a call fails, the failure count is incremented.
- *   If the failure count reaches the `failureThreshold`, the state changes to [OPEN][CircuitState.OPEN].
+ * - **[CLOSED][CircuitState.CLOSED]**: All calls are allowed to pass through. Failed calls advance failure tracking
+ *   until [CircuitBreakerConfig.failureThreshold] is reached (consecutive failures by default, or failures within
+ *   [CircuitBreakerConfig.slidingWindow] when set), then the state changes to [OPEN][CircuitState.OPEN].
  * - **[OPEN][CircuitState.OPEN]**: All calls are immediately rejected with a [CircuitBreakerOpenException] without
  *   attempting to execute them. After a configured `timeout`, the state changes to [HALF_OPEN][CircuitState.HALF_OPEN].
  * - **[HALF_OPEN][CircuitState.HALF_OPEN]**: A limited number of calls (`halfOpenMaxCalls`) are allowed to pass through to test
@@ -54,7 +55,9 @@ interface CircuitBreaker {
  * Point-in-time snapshot of a [CircuitBreaker] for health/readiness and metrics.
  *
  * @property state Current circuit state (CLOSED, OPEN, HALF_OPEN).
- * @property failureCount Number of consecutive failures in CLOSED state (reset on success or when opening).
+ * @property failureCount In consecutive mode: failures in CLOSED since last success. In [CircuitBreakerConfig.slidingWindow]
+ * mode: number of failure timestamps currently inside the window (after pruning). While OPEN, may reflect the count
+ * at trip time (implementation detail); use for metrics/health only.
  * @property successCount Number of consecutive successes in HALF_OPEN state (reset when circuit opens or closes).
  */
 data class CircuitBreakerSnapshot(
@@ -90,8 +93,9 @@ enum class CircuitState {
  * val circuitBreaker = CircuitBreaker.create(config)
  * ```
  *
- * @property failureThreshold The number of consecutive failures required to open the circuit.
- * The circuit transitions to the [OPEN][CircuitState.OPEN] state after this many failures.
+ * @property failureThreshold Number of failures required to open the circuit from [CLOSED][CircuitState.CLOSED].
+ * - If [slidingWindow] is `null`: **consecutive** failures (a success resets the count to 0).
+ * - If [slidingWindow] is set: failures whose timestamps fall within the sliding window (not necessarily consecutive).
  * Defaults to `5`.
  *
  * @property successThreshold The number of consecutive successes required to close the circuit
@@ -112,6 +116,12 @@ enum class CircuitState {
  * @property onStateChange Invoked when the circuit state changes. Receives the **new** state only.
  * When the policy is built via [com.santimattius.resilient.composition.resilient], telemetry events
  * ([ResilientEvent.CircuitStateChanged]) receive both the previous and new state.
+ *
+ * @property slidingWindow When `null` (default), [failureThreshold] counts **consecutive** failures in CLOSED.
+ * When set to a **positive** duration, failures in CLOSED are recorded with a timestamp; entries older than
+ * this window are discarded. The circuit opens when at least [failureThreshold] failures fall inside the window.
+ * Success in CLOSED only **prunes** expired failures (it does not clear recent failures). [HALF_OPEN][CircuitState.HALF_OPEN]
+ * and [OPEN][CircuitState.OPEN] behavior is unchanged.
  */
 class CircuitBreakerConfig {
     var failureThreshold: Int = 5
@@ -120,6 +130,7 @@ class CircuitBreakerConfig {
     var halfOpenMaxCalls: Int = 3
     var shouldRecordFailure: (Throwable) -> Boolean = { true }
     var onStateChange: (CircuitState) -> Unit = { }
+    var slidingWindow: Duration? = null
 }
 
 /**

@@ -45,7 +45,7 @@ val job = scope.launch {
 
 ## Composition Order
 Outer → Inner (default):
-- Fallback → Cache → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → Block
+- Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → Block
 - Fallback wraps outermost to handle failures after all policies.
 
 ### Custom Composition Order
@@ -57,6 +57,7 @@ import com.santimattius.resilient.composition.OrderablePolicyType
 val policy = resilient(scope) {
     compositionOrder(listOf(
         OrderablePolicyType.CACHE,        // Check cache first (after Fallback)
+        OrderablePolicyType.COALESCE,     // Deduplicate in-flight requests by key
         OrderablePolicyType.TIMEOUT,      // Then apply timeout
         OrderablePolicyType.RETRY,        // Retry on failures
         OrderablePolicyType.CIRCUIT_BREAKER,
@@ -71,7 +72,8 @@ val policy = resilient(scope) {
 
 **Important Notes:**
 - **Fallback is not included** in `OrderablePolicyType` - it is always positioned outermost automatically
-- All orderable policy types (7 total) must be included in the custom order exactly once
+- `compositionOrder(...)` accepts a subset: policy types not included are appended in the default order
+- Duplicates are removed
 - Fallback must remain outermost to catch all failures from other policies
 - The order affects how policies interact with each other, so choose carefully based on your use case
 
@@ -96,6 +98,8 @@ val policy = resilient {
 
 ### Retry
 Retries failing operations according to a backoff strategy and predicate. Use **shouldRetry** to avoid retrying non-transient errors (e.g. 4xx client errors); retry only on 5xx, network/IO, or timeouts. Optional **perAttemptTimeout** limits each attempt (including the first) so a single slow attempt does not consume the whole retry budget.
+
+Optional **shouldRetryResult** retries when the block returns successfully but the value is not acceptable (e.g. HTTP 202, empty body, “not ready” flag). Return `true` from the predicate to request another attempt; it shares the same **maxAttempts** budget as exception-based retries. **`onRetry`** receives `RetryableResultException` (with `lastValue`) for telemetry; if attempts are exhausted while the predicate stays `true`, the **last returned value** is returned (unlike exception exhaustion, which rethrows).
 ```kotlin
 import com.santimattius.resilient.retry.*
 
@@ -103,6 +107,7 @@ val policy = resilient {
     retry {
         maxAttempts = 4
         shouldRetry = { it is java.io.IOException }  // e.g. only retry IO; do not retry 4xx
+        shouldRetryResult = { status -> (status as Int) >= 500 } // e.g. retry on 5xx-like codes returned as value
         perAttemptTimeout = 5.seconds               // optional: timeout per attempt
         backoffStrategy = ExponentialBackoff(
             initialDelay = 200.milliseconds,
@@ -117,13 +122,16 @@ Supported backoffs: `ExponentialBackoff`, `LinearBackoff`, `FixedBackoff`.
 
 ### Circuit Breaker
 Prevents hammering failing downstreams. States: CLOSED → OPEN → HALF_OPEN.
+
+By default, **`failureThreshold`** counts **consecutive** failures in CLOSED (a success resets the count). Set **`slidingWindow`** to a positive duration to open when **`failureThreshold`** failures fall **within that time window** (not necessarily consecutive); successes only prune expired timestamps from the window.
 ```kotlin
-val policy = resilient {
+val policy = resilient(scope) {
     circuitBreaker {
         failureThreshold = 5
         successThreshold = 2
         halfOpenMaxCalls = 1
         timeout = 60.seconds // OPEN duration
+        slidingWindow = 30.seconds // optional: time-based failure window
     }
 }
 ```
@@ -144,11 +152,30 @@ val policy = resilient {
 ### Bulkhead
 Limit concurrent executions and queued waiters; optional acquire timeout.
 ```kotlin
-val policy = resilient {
+val policy = resilient(scope) {
     bulkhead {
         maxConcurrentCalls = 8
         maxWaitingCalls = 32
         timeout = 2.seconds
+    }
+}
+```
+
+**Named / shared bulkhead:** use `BulkheadRegistry` so several policies share the same pool (e.g. one limit for all `"database"` calls). Cannot combine `bulkhead { }` and `bulkheadNamed(...)` in the same policy.
+```kotlin
+import com.santimattius.resilient.bulkhead.BulkheadRegistry
+
+val bulkheads = BulkheadRegistry()
+
+val policyA = resilient(scope) {
+    bulkheadNamed(bulkheads, "database") {
+        maxConcurrentCalls = 4
+        maxWaitingCalls = 16
+    }
+}
+val policyB = resilient(scope) {
+    bulkheadNamed(bulkheads, "database") {
+        maxConcurrentCalls = 4 // first registration wins; same instance as policyA
     }
 }
 ```
@@ -180,6 +207,17 @@ policy.cacheHandle?.invalidate("users:123")
 policy.cacheHandle?.invalidatePrefix("user:")
 ```
 The in-memory implementation is one possible `CachePolicy`; custom backends (e.g. persistent storage or Redis) can implement the same interface.
+
+### Coalescing (Request Deduplication)
+Deduplicates **concurrent in-flight** executions by key. If multiple callers resolve the same key while the operation is still running, only one block execution happens and all callers share the same result (or error). It does **not** cache completed results; for TTL caching, use `cache { ... }`.
+```kotlin
+val policy = resilient(scope) {
+    coalesce {
+        key = "profile:42" // fixed key
+        // or keyProvider = { "profile:${userId}" } // dynamic key
+    }
+}
+```
 
 ### Health / Readiness
 Use `policy.getHealthSnapshot()` to build health or readiness endpoints (e.g. Kubernetes probes, `/health` API). The snapshot includes circuit breaker state and counters, and bulkhead usage when configured.
@@ -249,7 +287,112 @@ setContent { ResilientExample() }
 - Cache only idempotent reads; set TTL appropriately.
 - Always observe telemetry (including CacheHit/CacheMiss, FallbackTriggered) for visibility and tuning.
 
+## Testing with `resilient-test`
+
+The `resilient-test` module provides utilities for testing resilience policies with fault injection and simplified policy builders.
+
+### Fault Injection
+
+Use `FaultInjector` to simulate failures, delays, and intermittent behavior in your tests:
+
+```kotlin
+import com.santimattius.resilient.test.FaultInjector
+import kotlin.time.Duration.Companion.milliseconds
+
+val injector = FaultInjector.builder()
+    .failureRate(0.3)           // 30% chance of failure
+    .delay(50.milliseconds)      // Add 50ms delay
+    .delayJitter(true)           // Randomize delay ±20%
+    .exception { CustomException() }  // Custom exception
+    .build()
+
+val result = injector.execute {
+    fetchData() // may throw or delay
+}
+```
+
+**Configuration:**
+- `failureRate(rate: Double)`: Probability of throwing an exception (0.0 = never, 1.0 = always).
+- `exception(block: () -> Throwable)`: Factory for the exception to throw (default: `FaultInjectedException`).
+- `delay(duration: Duration)`: Fixed delay before executing the block (default: `Duration.ZERO`).
+- `delayJitter(enable: Boolean)`: Randomize delay ±20% (default: `false`).
+
+### Policy Builders for Tests
+
+Use `PolicyBuilders` to create policies with sensible test defaults:
+
+```kotlin
+import com.santimattius.resilient.test.PolicyBuilders
+import com.santimattius.resilient.test.TestResilientScope
+import kotlinx.coroutines.test.runTest
+
+@Test
+fun `test retry with fault injection`() = runTest {
+    val scope = TestResilientScope(this)
+    val policy = PolicyBuilders.retryPolicy(
+        scope,
+        maxAttempts = 3,
+        initialDelay = 10.milliseconds
+    )
+    
+    val injector = FaultInjector.builder()
+        .failureRate(0.5)
+        .build()
+    
+    val result = policy.execute {
+        injector.execute { "success" }
+    }
+    
+    assertEquals("success", result)
+}
+```
+
+**Available builders:**
+- `retryPolicy(scope, maxAttempts = 3, initialDelay = 10ms, maxDelay = 100ms, shouldRetry = { true })`
+- `timeoutPolicy(scope, timeout = 1.second)`
+- `circuitBreakerPolicy(scope, failureThreshold = 3, successThreshold = 2, timeout = 5.seconds)`
+- `bulkheadPolicy(scope, maxConcurrentCalls = 2, maxWaitingCalls = 4)`
+- `rateLimiterPolicy(scope, maxCalls = 5, period = 1.second)`
+
+### TestResilientScope
+
+Use `TestResilientScope` to create a test-friendly scope for policies:
+
+```kotlin
+import com.santimattius.resilient.test.TestResilientScope
+import kotlinx.coroutines.test.runTest
+
+@Test
+fun `test policy lifecycle`() = runTest {
+    val scope = TestResilientScope(this)
+    val policy = resilient(scope) {
+        retry { maxAttempts = 3 }
+    }
+    
+    // ... test logic
+    
+    scope.cancel() // cleanup
+}
+```
+
+### Gradle Dependency
+
+Add the `resilient-test` module to your test dependencies:
+
+```kotlin
+// build.gradle.kts
+kotlin {
+    sourceSets {
+        commonTest.dependencies {
+            implementation("io.github.santimattius.resilient:resilient-test:1.3.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+        }
+    }
+}
+```
+
 ## Testing Notes
-- Use kotlinx-coroutines-test for virtual time.
+- Use `kotlinx-coroutines-test` for virtual time with `runTest` and `TestTimeSource`.
+- Use `FaultInjector` to simulate realistic failure scenarios (intermittent errors, slow responses).
 - Verify: retry attempts and delays, CB transitions, RL windows, BH limits, composition order, cancellation propagation, telemetry.
 

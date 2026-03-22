@@ -30,3 +30,4 @@ dependencyResolutionManagement {
 
 include(":androidApp")
 include(":shared")
+include(":resilient-test")

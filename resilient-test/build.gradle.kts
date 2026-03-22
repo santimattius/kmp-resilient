@@ -9,7 +9,7 @@ plugins {
 
 kotlin {
     androidLibrary {
-        namespace = "io.github.santimattius.resilient"
+        namespace = "io.github.santimattius.resilient.test"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
@@ -35,7 +35,6 @@ kotlin {
         nodejs()
     }
 
-    // Native targets - Tier 1 only
     macosArm64()
 
     listOf(
@@ -44,21 +43,19 @@ kotlin {
         iosSimulatorArm64()
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
-            baseName = "Resilient"
+            baseName = "ResilientTest"
             isStatic = true
         }
     }
 
     sourceSets {
         commonMain.dependencies {
-            // put your Multiplatform dependencies here
             implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.kotlinx.datetime)
+            api(project(":shared"))
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
-            implementation(libs.turbine)
         }
         val jvmTest by getting {
             dependencies {
@@ -72,7 +69,7 @@ kotlin {
 mavenPublishing {
     coordinates(
         groupId = project.group.toString(),
-        artifactId = "resilient",
+        artifactId = "resilient-test",
         version = project.version.toString()
     )
 }
