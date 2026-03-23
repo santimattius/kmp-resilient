@@ -93,6 +93,7 @@ val policy = resilient {
     }
 }
 ```
+→ [In-depth documentation](docs/patterns/timeout.md)
 
 ### Retry
 Retries failing operations according to a backoff strategy and predicate. Use **shouldRetry** to avoid retrying non-transient errors (e.g. 4xx client errors); retry only on 5xx, network/IO, or timeouts. Optional **perAttemptTimeout** limits each attempt (including the first) so a single slow attempt does not consume the whole retry budget.
@@ -114,6 +115,7 @@ val policy = resilient {
 }
 ```
 Supported backoffs: `ExponentialBackoff`, `LinearBackoff`, `FixedBackoff`.
+→ [In-depth documentation](docs/patterns/retry.md)
 
 ### Circuit Breaker
 Prevents hammering failing downstreams. States: CLOSED → OPEN → HALF_OPEN.
@@ -127,6 +129,7 @@ val policy = resilient {
     }
 }
 ```
+→ [In-depth documentation](docs/patterns/circuit-breaker.md)
 
 ### Rate Limiter
 Token-bucket rate limiting: tokens refill at the **start of each period** (fixed-window refill). With `maxCalls = 10` and `period = 1.seconds`, at most 10 calls per second are allowed. One bucket per policy (global limit). Optional max wait when limited.
@@ -140,6 +143,7 @@ val policy = resilient {
     }
 }
 ```
+→ [In-depth documentation](docs/patterns/rate-limiter.md)
 
 ### Bulkhead
 Limit concurrent executions and queued waiters; optional acquire timeout.
@@ -152,6 +156,7 @@ val policy = resilient {
     }
 }
 ```
+→ [In-depth documentation](docs/patterns/bulkhead.md)
 
 ### Hedging
 Launch parallel attempts and return the first successful result. Use carefully (extra load).
@@ -163,6 +168,7 @@ val policy = resilient {
     }
 }
 ```
+→ [In-depth documentation](docs/patterns/hedging.md)
 
 ### Cache (In-Memory TTL)
 Cache successful results per key with TTL. Use a fixed **key** or a **keyProvider** (suspend) for dynamic keys (e.g. per user, per request). Invalidation is available via `policy.cacheHandle` when cache is configured.
@@ -180,6 +186,7 @@ policy.cacheHandle?.invalidate("users:123")
 policy.cacheHandle?.invalidatePrefix("user:")
 ```
 The in-memory implementation is one possible `CachePolicy`; custom backends (e.g. persistent storage or Redis) can implement the same interface.
+→ [In-depth documentation](docs/patterns/cache.md)
 
 ### Health / Readiness
 Use `policy.getHealthSnapshot()` to build health or readiness endpoints (e.g. Kubernetes probes, `/health` API). The snapshot includes circuit breaker state and counters, and bulkhead usage when configured.
@@ -210,6 +217,7 @@ val policy = resilient {
     })
 }
 ```
+→ [In-depth documentation](docs/patterns/fallback.md)
 
 ---
 
@@ -252,4 +260,23 @@ setContent { ResilientExample() }
 ## Testing Notes
 - Use kotlinx-coroutines-test for virtual time.
 - Verify: retry attempts and delays, CB transitions, RL windows, BH limits, composition order, cancellation propagation, telemetry.
+
+---
+
+## Pattern Reference
+
+Theoretical and technical deep-dive documentation for each pattern — definition, when to apply, configuration reference, and extended examples:
+
+| Pattern | Document |
+|---|---|
+| Timeout | [docs/patterns/timeout.md](docs/patterns/timeout.md) |
+| Retry | [docs/patterns/retry.md](docs/patterns/retry.md) |
+| Circuit Breaker | [docs/patterns/circuit-breaker.md](docs/patterns/circuit-breaker.md) |
+| Rate Limiter | [docs/patterns/rate-limiter.md](docs/patterns/rate-limiter.md) |
+| Bulkhead | [docs/patterns/bulkhead.md](docs/patterns/bulkhead.md) |
+| Hedging | [docs/patterns/hedging.md](docs/patterns/hedging.md) |
+| Cache | [docs/patterns/cache.md](docs/patterns/cache.md) |
+| Fallback | [docs/patterns/fallback.md](docs/patterns/fallback.md) |
+
+→ [Full index with descriptions](docs/patterns/INDEX.md)
 
