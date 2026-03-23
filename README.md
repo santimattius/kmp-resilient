@@ -421,5 +421,5 @@ Theoretical and technical deep-dive documentation for each pattern — definitio
 | Cache | [docs/patterns/cache.md](docs/patterns/cache.md) |
 | Fallback | [docs/patterns/fallback.md](docs/patterns/fallback.md) |
 
-→ [Full index with descriptions](docs/INDEX.md)
+→ [Full index with descriptions](docs/README.md)
 
