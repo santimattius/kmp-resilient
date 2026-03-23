@@ -8,3 +8,13 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform) apply false
     alias(libs.plugins.mavenPublish) apply false
 }
+
+allprojects {
+    group = project.findProperty("PROJECT_GROUP")?.toString() ?: "io.github.santimattius.resilient"
+    version = project.findProperty("PROJECT_VERSION")?.toString() ?: "1.4.0-APLHA01"
+
+    repositories {
+        mavenCentral()
+        google()
+    }
+}
