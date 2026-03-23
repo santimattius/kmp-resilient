@@ -7,6 +7,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+## [1.4.0] - 2026-03-22
+
+### Added
+
+- **Coalescing Policy**
+  - New `CoalescingPolicy` for in-flight request deduplication: concurrent executions with the same key share a single underlying call instead of all running independently.
+  - `CoalesceConfig` with a `keyProvider` to derive the deduplication key from context.
+  - New `OrderablePolicyType.COALESCE` / `PolicyType.COALESCE` integrated in the default composition order.
+  - `ResilientBuilder.coalesce { }` DSL and `ResilientScope.async` helper for launching coalesced work without cancellation propagation.
+- **Retry — result-based retries**
+  - `RetryPolicyConfig.shouldRetryResult`: predicate that triggers another attempt when the block *succeeds* but the returned value is not acceptable (e.g. HTTP 202, empty body, "not ready" flag).
+  - Shares the same `maxAttempts` budget as exception-based retries. If attempts are exhausted while the predicate stays `true`, the last returned value is returned (unlike exception exhaustion, which rethrows).
+  - `onRetry` receives `RetryableResultException` (with `lastValue`) for telemetry/observability.
+- **Circuit Breaker — sliding-window mode**
+  - `CircuitBreakerConfig.slidingWindow`: optional `Duration` that switches the breaker from consecutive-failure counting to a time-based window. The breaker opens when `failureThreshold` failures occur within the window; successes prune expired timestamps from the window.
+- **BulkheadRegistry**
+  - `BulkheadRegistry` for named, shared bulkhead instances so multiple policies can share the same concurrency pool (e.g. all `"database"` calls).
+  - `ResilientBuilder.bulkheadNamed(registry, name, config)` DSL — mutually exclusive with `bulkhead { }`.
+- **resilient-test module** *(new artifact: `resilient-test`)*
+  - `FaultInjector`: simulate failures, delays, and intermittent behaviour in tests via a fluent builder (`failureRate`, `delay`, `delayJitter`, `exception`).
+  - `PolicyBuilders`: pre-configured resilience policies with sensible, fast test defaults (`retryPolicy`, `timeoutPolicy`, `circuitBreakerPolicy`, `bulkheadPolicy`, `rateLimiterPolicy`).
+  - `TestResilientScope`: factory for creating test-friendly `ResilientScope` instances compatible with `runTest` and virtual time.
+
+### Changed
+
+- **Build**
+  - Maven publishing configuration centralised in `gradle.properties` (group, version, POM metadata, signing). The legacy `resilient-maven-publishing.gradle` script has been removed; all modules now use `mavenPublishing.coordinates(...)` driven from root properties.
+
+---
+
 ## [1.3.0] - 2026-03-18
 
 Official release.
@@ -117,6 +147,7 @@ Planned items: cache (dynamic key, invalidation), timeout (documentation and per
 
 ---
 
+[1.4.0]: https://github.com/santimattius/kmp-resilient/compare/1.3.0...1.4.0
 [1.3.0-ALPHA01]: https://github.com/santimattius/kmp-resilient/compare/1.2.0...1.3.0-ALPHA01
 [1.2.0]: https://github.com/santimattius/kmp-resilient/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/santimattius/kmp-resilient/compare/1.0.0...1.1.0

@@ -5,6 +5,7 @@ import com.santimattius.resilient.retry.ExponentialBackoff
 import com.santimattius.resilient.retry.FixedBackoff
 import com.santimattius.resilient.retry.LinearBackoff
 import com.santimattius.resilient.retry.RetryPolicyConfig
+import com.santimattius.resilient.retry.RetryableResultException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.TimeoutCancellationException
@@ -16,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -317,4 +319,70 @@ class RetryPolicyTest {
         // Should retry 2 times, then fail on 3rd attempt
         assertEquals(3, attempts, "Should attempt 3 times (1 initial + 2 retries)")
     }
+
+    @Test
+    fun `given retry policy when shouldRetryResult true then retries until predicate false`() = runTest {
+        val cfg = RetryPolicyConfig().apply {
+            maxAttempts = 5
+            shouldRetryResult = { (it as Int) < 3 }
+            backoffStrategy = FixedBackoff(delay = 1.milliseconds)
+        }
+        val policy = DefaultRetryPolicy(cfg)
+        var attempts = 0
+
+        val result = policy.execute {
+            attempts++
+            attempts
+        }
+
+        assertEquals(3, attempts)
+        assertEquals(3, result)
+    }
+
+    @Test
+    fun `given retry policy when shouldRetryResult always true and max attempts reached then returns last value`() =
+        runTest {
+            val cfg = RetryPolicyConfig().apply {
+                maxAttempts = 2
+                shouldRetryResult = { true }
+                backoffStrategy = FixedBackoff(delay = 1.milliseconds)
+            }
+            val policy = DefaultRetryPolicy(cfg)
+            var attempts = 0
+
+            val result = policy.execute {
+                attempts++
+                "last"
+            }
+
+            assertEquals(2, attempts)
+            assertEquals("last", result)
+        }
+
+    @Test
+    fun `given retry policy when shouldRetryResult triggers retry then onRetry receives RetryableResultException`() =
+        runTest {
+            val received = mutableListOf<Pair<Int, Throwable>>()
+            val cfg = RetryPolicyConfig().apply {
+                maxAttempts = 3
+                shouldRetryResult = { (it as Int) < 2 }
+                backoffStrategy = FixedBackoff(delay = 1.milliseconds)
+                onRetry = { attempt, error -> received.add(attempt to error) }
+            }
+            val policy = DefaultRetryPolicy(cfg)
+            var attempts = 0
+
+            val result = policy.execute {
+                attempts++
+                attempts
+            }
+
+            assertEquals(2, attempts)
+            assertEquals(2, result)
+            assertEquals(1, received.size)
+            val (attempt, error) = received.single()
+            assertEquals(1, attempt)
+            val rre = assertIs<RetryableResultException>(error)
+            assertEquals(1, rre.lastValue)
+        }
 }
