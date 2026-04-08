@@ -11,7 +11,7 @@ plugins {
 
 allprojects {
     group = project.findProperty("PROJECT_GROUP")?.toString() ?: "io.github.santimattius.resilient"
-    version = project.findProperty("PROJECT_VERSION")?.toString() ?: "1.4.0-APLHA01"
+    version = project.findProperty("PROJECT_VERSION")?.toString() ?: "1.4.0-APLHA02"
 
     repositories {
         mavenCentral()
