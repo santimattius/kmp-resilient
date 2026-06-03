@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+### Added
+
+- **CircuitBreakerRegistry**
+  - `CircuitBreakerRegistry` for named, shared circuit breaker instances so multiple policies can share the same breaker state (e.g. all calls to `"payments"` trip a single breaker).
+  - `ResilientBuilder.circuitBreakerNamed(registry, name, config)` DSL — mutually exclusive with `circuitBreaker { }`.
+  - **Telemetry note:** only the first policy that registers a name in the registry receives `CircuitStateChanged` telemetry events via its `events` SharedFlow. Subsequent policies reusing the same entry share the breaker state but not its telemetry callback. Observe shared state directly via `DefaultCircuitBreaker.state`.
+
 ## [1.4.0] - 2026-03-22
 
 ### Added
