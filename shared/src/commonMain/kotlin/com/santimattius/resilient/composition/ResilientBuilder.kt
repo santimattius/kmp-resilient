@@ -12,6 +12,7 @@ import com.santimattius.resilient.cache.CacheHandle
 import com.santimattius.resilient.cache.InMemoryCachePolicy
 import com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig
 import com.santimattius.resilient.circuitbreaker.DefaultCircuitBreaker
+import com.santimattius.resilient.deadline.ResilientDeadline
 import com.santimattius.resilient.fallback.FallbackConfig
 import com.santimattius.resilient.fallback.FallbackPolicy
 import com.santimattius.resilient.hedging.DefaultHedgingPolicy
@@ -27,6 +28,8 @@ import com.santimattius.resilient.timeout.TimeoutConfig
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.withTimeout
 import kotlin.time.TimeSource
 
 /**
@@ -362,23 +365,29 @@ fun resilient(
             bulkhead = bulkhead?.snapshot()
         )
 
+        @OptIn(ResilientExperimentalApi::class)
         override suspend fun <T> execute(block: Execute<T>): T {
+            // Deadline intercept: check for a ResilientDeadline in the coroutine context.
+            // Must be read before compose() so we capture the context of the *caller*.
+            val deadline = currentCoroutineContext()[ResilientDeadline.Key]
+            val composed = buildComposed(block)
+
             val mark = TimeSource.Monotonic.markNow()
             return try {
-                val composed = compose(
-                    cache = cache,
-                    coalescing = coalescing,
-                    timeout = timeoutPolicy,
-                    retry = retry,
-                    circuitBreaker = circuitBreaker,
-                    rateLimiter = rateLimiter,
-                    bulkhead = bulkhead,
-                    hedging = hedging,
-                    fallback = fallback,
-                    compositionOrder = builder.compositionOrder,
-                    block = block
-                )
-                val result = composed()
+                val result = if (deadline != null) {
+                    // Compute the effective timeout: min(configured timeout, remaining deadline).
+                    // When remaining <= 0, effectiveTimeoutMs is <= 0 — withTimeout(<=0L)
+                    // throws TimeoutCancellationException immediately without invoking the block.
+                    val remainingMs = deadline.remaining().inWholeMilliseconds
+                    val effectiveTimeoutMs = if (builder.timeoutConfig != null) {
+                        minOf(builder.timeoutConfig!!.timeout.inWholeMilliseconds, remainingMs)
+                    } else {
+                        remainingMs
+                    }
+                    withTimeout(effectiveTimeoutMs) { composed() }
+                } else {
+                    composed()
+                }
                 events.emit(ResilientEvent.OperationSuccess(mark.elapsedNow()))
                 result
             } catch (t: Throwable) {
@@ -386,6 +395,20 @@ fun resilient(
                 throw t
             }
         }
+
+        private fun <T> buildComposed(block: Execute<T>): Execute<T> = compose(
+            cache = cache,
+            coalescing = coalescing,
+            timeout = timeoutPolicy,
+            retry = retry,
+            circuitBreaker = circuitBreaker,
+            rateLimiter = rateLimiter,
+            bulkhead = bulkhead,
+            hedging = hedging,
+            fallback = fallback,
+            compositionOrder = builder.compositionOrder,
+            block = block
+        )
 
         override fun close() {
             cache?.close()
