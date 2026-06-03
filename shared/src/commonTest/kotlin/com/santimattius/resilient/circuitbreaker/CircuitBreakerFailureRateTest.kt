@@ -52,7 +52,7 @@ class CircuitBreakerFailureRateTest {
     // ──────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `given 10 calls with 4 failures (40 percent) when threshold is 50 percent then circuit stays CLOSED`() =
+    fun `given 10 calls with 4 failures 40 percent when threshold is 50 percent then circuit stays CLOSED`() =
         runTest {
             val cfg = CircuitBreakerConfig().apply {
                 failureRateThreshold = 50.0
@@ -78,7 +78,7 @@ class CircuitBreakerFailureRateTest {
     // ──────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `given 10 calls with 5 failures (50 percent) when threshold is 50 percent then circuit opens`() =
+    fun `given 10 calls with 5 failures 50 percent when threshold is 50 percent then circuit opens`() =
         runTest {
             val cfg = CircuitBreakerConfig().apply {
                 failureRateThreshold = 50.0
@@ -139,7 +139,7 @@ class CircuitBreakerFailureRateTest {
     // ──────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `given failureRateThreshold null when 5 consecutive failures then circuit opens (no regression)`() =
+    fun `given failureRateThreshold null when 5 consecutive failures then circuit opens no regression`() =
         runTest {
             val cfg = CircuitBreakerConfig().apply {
                 failureRateThreshold = null
