@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+### Added
+
+- **Richer PolicyHealthSnapshot**
+  - `RateLimiterSnapshot(remainingCalls: Int, timeToRefill: Duration)` — exposes current token count and time until the next bucket refill.
+  - `RetrySnapshot(maxAttempts: Int)` — exposes the configured maximum attempt count.
+  - `CacheSnapshot(entryCount: Int, hitRate: Double)` — exposes current cache entry count and cumulative hit rate (`Double.NaN` when no calls have been made yet).
+  - `PolicyHealthSnapshot` gains three nullable trailing fields (`rateLimiter`, `retry`, `cache`) with `null` defaults — source-compatible with existing consumers.
+  - `DefaultRateLimiter.snapshot()` reads `@Volatile` token state for a non-blocking, approximation-safe snapshot.
+  - `DefaultRetryPolicy.snapshot()` reflects the immutable `maxAttempts` configuration.
+  - `InMemoryCachePolicy` tracks cumulative `hitCount` and `missCount` via `@Volatile` counters; `snapshot()` computes `hitRate` from those counters.
+
 ## [1.4.0] - 2026-03-22
 
 ### Added

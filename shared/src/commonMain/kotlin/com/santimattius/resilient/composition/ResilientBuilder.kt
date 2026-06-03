@@ -359,7 +359,10 @@ fun resilient(
 
         override fun getHealthSnapshot(): PolicyHealthSnapshot = PolicyHealthSnapshot(
             circuitBreaker = circuitBreaker?.snapshot(),
-            bulkhead = bulkhead?.snapshot()
+            bulkhead = bulkhead?.snapshot(),
+            rateLimiter = rateLimiter?.snapshot(),
+            retry = retry?.snapshot(),
+            cache = cache?.snapshot()
         )
 
         override suspend fun <T> execute(block: Execute<T>): T {

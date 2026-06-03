@@ -1,5 +1,6 @@
 package com.santimattius.resilient.retry
 
+import com.santimattius.resilient.RetrySnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
@@ -36,6 +37,11 @@ class DefaultRetryPolicy(
             "maxAttempts must be >= 1, got ${config.maxAttempts}"
         }
     }
+
+    /**
+     * Returns a point-in-time snapshot of the retry policy configuration.
+     */
+    fun snapshot(): RetrySnapshot = RetrySnapshot(maxAttempts = config.maxAttempts)
 
     override suspend fun <T> execute(block: suspend () -> T): T {
         var lastError: Throwable? = null

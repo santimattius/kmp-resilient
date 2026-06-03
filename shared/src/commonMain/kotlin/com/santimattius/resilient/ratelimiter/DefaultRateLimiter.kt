@@ -1,5 +1,6 @@
 package com.santimattius.resilient.ratelimiter
 
+import com.santimattius.resilient.RateLimiterSnapshot
 import com.santimattius.resilient.circuitbreaker.SystemTimeSource
 import com.santimattius.resilient.circuitbreaker.TimeSource
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -10,6 +11,7 @@ import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.Volatile
 import kotlin.math.min
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -49,8 +51,32 @@ class DefaultRateLimiter(
     }
 
     private val mutex = Mutex()
+
+    @Volatile
     private var tokens: Int = config.maxCalls
+
+    @Volatile
     private var lastRefillMs: Long = timeSource.currentTimeMillis()
+
+    /**
+     * Returns a point-in-time snapshot of the rate limiter state.
+     *
+     * **Thread-safety note:** [tokens] and [lastRefillMs] are read from `@Volatile` fields without
+     * holding [mutex]. Each field is individually visible across threads but the combination may be
+     * momentarily inconsistent. This is an intentional approximation suitable for health-check
+     * endpoints and dashboards.
+     */
+    fun snapshot(): RateLimiterSnapshot {
+        val currentTokens = tokens
+        val periodMs = config.period.inWholeMilliseconds
+        val now = timeSource.currentTimeMillis()
+        val elapsed = now - lastRefillMs
+        val remaining = (periodMs - (elapsed % periodMs)).coerceAtLeast(0)
+        return RateLimiterSnapshot(
+            remainingCalls = currentTokens.coerceAtLeast(0),
+            timeToRefill = remaining.milliseconds
+        )
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override suspend fun <T> execute(block: suspend () -> T): T {
