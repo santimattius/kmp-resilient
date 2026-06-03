@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+### Added
+
+- **RateLimiterRegistry**
+  - `RateLimiterRegistry` for named, shared rate-limiter instances so multiple policies can share the same token-bucket quota (e.g. all `"payments"` calls consume from the same pool).
+  - `getOrCreate(name, configure, onRateLimited?)` follows a first-name-wins contract: the first call for a given name creates the limiter; subsequent calls return the same instance and ignore the configure block. Not synchronized across threads (startup-time construct, matching `BulkheadRegistry` contract).
+  - `ResilientBuilder.rateLimiterNamed(registry, name, configure)` DSL — mutually exclusive with `rateLimiter { }`. Throws `IllegalArgumentException` at build time if both are configured.
+
 ## [1.4.0] - 2026-03-22
 
 ### Added
