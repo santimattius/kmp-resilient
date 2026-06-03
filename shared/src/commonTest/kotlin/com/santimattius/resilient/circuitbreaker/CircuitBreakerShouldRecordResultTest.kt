@@ -134,7 +134,7 @@ class CircuitBreakerShouldRecordResultTest {
         }
 
     @Test
-    fun `S3 - given default config (no shouldRecordResult set) when calls succeed then circuit stays CLOSED`() =
+    fun `S3 - given default config no shouldRecordResult set when calls succeed then circuit stays CLOSED`() =
         runTest {
             // Default config has shouldRecordResult = null
             val cfg = CircuitBreakerConfig().apply {
@@ -158,7 +158,7 @@ class CircuitBreakerShouldRecordResultTest {
                 failureThreshold = 2
                 shouldRecordResult = { true }
                 // Only IOExceptions should be recorded — IllegalStateException should NOT
-                shouldRecordFailure = { it is java.io.IOException }
+                shouldRecordFailure = { it is RuntimeException && it.message?.startsWith("io:") == true }
             }
             val cb = DefaultCircuitBreaker(cfg)
 
@@ -180,15 +180,15 @@ class CircuitBreakerShouldRecordResultTest {
             val cfg = CircuitBreakerConfig().apply {
                 failureThreshold = 2
                 shouldRecordResult = { false } // result predicate does not interfere
-                shouldRecordFailure = { it is java.io.IOException }
+                shouldRecordFailure = { it is RuntimeException && it.message?.startsWith("io:") == true }
             }
             val cb = DefaultCircuitBreaker(cfg)
 
-            assertFailsWith<java.io.IOException> {
-                cb.execute { throw java.io.IOException("network error") }
+            assertFailsWith<RuntimeException> {
+                cb.execute { throw RuntimeException("io: network error") }
             }
-            assertFailsWith<java.io.IOException> {
-                cb.execute { throw java.io.IOException("network error") }
+            assertFailsWith<RuntimeException> {
+                cb.execute { throw RuntimeException("io: network error") }
             }
 
             // shouldRecordFailure allowed both → circuit opens
