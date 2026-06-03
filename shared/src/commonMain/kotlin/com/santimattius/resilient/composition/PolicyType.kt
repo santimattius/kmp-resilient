@@ -23,5 +23,7 @@ internal enum class PolicyType {
     /** Bulkhead: limits concurrency. */
     BULKHEAD,
     /** Hedging: parallel attempts, first success wins. */
-    HEDGING
+    HEDGING,
+    /** Chaos: injects faults, latency, or overridden results; innermost wrapper. */
+    CHAOS
 }

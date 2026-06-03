@@ -2,6 +2,8 @@ package com.santimattius.resilient.composition
 
 import com.santimattius.resilient.ResilientPolicy
 import com.santimattius.resilient.annotations.ResilientExperimentalApi
+import com.santimattius.resilient.chaos.ChaosConfig
+import com.santimattius.resilient.chaos.DefaultChaosPolicy
 import com.santimattius.resilient.coalescing.CoalesceConfig
 import com.santimattius.resilient.coalescing.DefaultCoalescingPolicy
 import com.santimattius.resilient.bulkhead.BulkheadConfig
@@ -90,6 +92,8 @@ class ResilientBuilder {
     internal var coalesceConfig: CoalesceConfig? = null
     internal var fallbackConfig: FallbackConfig<Any?>? = null
     internal var hedgingConfig: HedgingConfig? = null
+    @ResilientExperimentalApi
+    internal var chaosConfig: ChaosConfig? = null
     internal var compositionOrder: CompositionOrder = CompositionOrder.DEFAULT
     internal var compositionOrderExplicitlySet: Boolean = false
 
@@ -190,6 +194,34 @@ class ResilientBuilder {
     }
 
     /**
+     * Configures the chaos policy for fault injection.
+     *
+     * **Production safeguard**: the policy is only installed when [ChaosConfig.enabled] is explicitly
+     * set to `true`. When disabled (the default), zero overhead is added — no wrapper is created.
+     *
+     * Chaos is positioned as the innermost wrapper (just before the user block) so it directly
+     * controls what the block sees: latency, faults, or overridden results.
+     *
+     * Example:
+     * ```kotlin
+     * resilient(scope) {
+     *     chaos {
+     *         enabled = true          // MUST be set — false by default
+     *         failureRate = 0.3       // 30% of calls throw
+     *         latency = 100.milliseconds
+     *     }
+     * }
+     * ```
+     *
+     * @param block Lambda to configure [ChaosConfig].
+     */
+    @ResilientExperimentalApi
+    fun chaos(block: ChaosConfig.() -> Unit) {
+        @OptIn(ResilientExperimentalApi::class)
+        chaosConfig = (chaosConfig ?: ChaosConfig()).apply(block)
+    }
+
+    /**
      * Configures the order in which policies are composed.
      * Policies are applied from outermost (first in list) to innermost (last in list).
      *
@@ -243,8 +275,10 @@ class ResilientBuilder {
  * 7. `rateLimiter`
  * 8. `bulkhead`
  * 9. `hedging`
+ * 10. `chaos` (only when [ChaosConfig.enabled] is `true`)
  *
- * This means a request will first pass through the `fallback`, then `cache`, then `coalesce`, and then `timeout`, and so on, until it reaches the core execution block, which is wrapped by the `hedging` policy.
+ * This means a request will first pass through the `fallback`, then `cache`, then `coalesce`, and then `timeout`, and so on, until it reaches the core execution block.
+ * The `chaos` policy (when enabled) is the innermost wrapper, injecting faults or latency directly around the user block.
  * The `fallback` policy is the last line of defense, catching any exceptions that bubble up through all other policies.
  *
  * Example: `fallback` -> `cache` -> `coalesce` -> `timeout` -> `retry` -> `...` -> `hedging` -> `block()`
@@ -353,6 +387,11 @@ fun resilient(
         }
     }
 
+    @OptIn(ResilientExperimentalApi::class)
+    val chaos = builder.chaosConfig?.takeIf { it.enabled }?.let { cfg ->
+        DefaultChaosPolicy(cfg)
+    }
+
     return object : ResilientPolicy {
         override val events: SharedFlow<ResilientEvent>
             get() = events.asSharedFlow()
@@ -365,6 +404,7 @@ fun resilient(
             bulkhead = bulkhead?.snapshot()
         )
 
+        @OptIn(ResilientExperimentalApi::class)
         override suspend fun <T> execute(block: Execute<T>): T {
             val mark = TimeSource.Monotonic.markNow()
             return try {
@@ -377,6 +417,7 @@ fun resilient(
                     rateLimiter = rateLimiter,
                     bulkhead = bulkhead,
                     hedging = hedging,
+                    chaos = chaos,
                     fallback = fallback,
                     compositionOrder = builder.compositionOrder,
                     block = block
@@ -394,6 +435,7 @@ fun resilient(
             cache?.close()
         }
 
+        @OptIn(ResilientExperimentalApi::class)
         private fun <T> compose(
             cache: InMemoryCachePolicy?,
             coalescing: DefaultCoalescingPolicy?,
@@ -403,6 +445,7 @@ fun resilient(
             rateLimiter: DefaultRateLimiter?,
             bulkhead: DefaultBulkhead?,
             hedging: DefaultHedgingPolicy?,
+            chaos: DefaultChaosPolicy?,
             fallback: FallbackPolicy?,
             compositionOrder: CompositionOrder,
             block: Execute<T>
@@ -447,10 +490,15 @@ fun resilient(
                         PolicyType.HEDGING -> hedging?.let { policy ->
                             { next: Execute<T> -> suspend { policy.execute { next() } } }
                         }
+
+                        PolicyType.CHAOS -> chaos?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
                     }
                 }
             } else {
                 buildList {
+                    if (chaos != null) add { next -> { chaos.execute { next() } } }
                     if (hedging != null) add { next -> { hedging.execute { next() } } }
                     if (bulkhead != null) add { next -> { bulkhead.execute { next() } } }
                     if (rateLimiter != null) add { next -> { rateLimiter.execute { next() } } }

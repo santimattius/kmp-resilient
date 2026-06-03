@@ -19,6 +19,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Half-open recovery (`successThreshold`) and the existing consecutive-failure and time-based sliding-window modes are unchanged.
 - `CoroutineScope.asResilientScope()` — creates a child `ResilientScope` linked to an existing `CoroutineScope`. Cancelling the outer scope cancels all internal background jobs (cache cleanup, coalescing). Use with `viewModelScope` or `lifecycleScope` to eliminate manual `ResilientScope` lifecycle management.
 - `CoroutineScope.resilient(block)` — shorthand extension that wraps `.asResilientScope()` + `resilient(scope, block)` in one call.
+- **Chaos Policy** *(experimental — `@ResilientExperimentalApi`)*
+  - `ChaosConfig`: DSL config for fault injection with `enabled` (defaults to `false` — production safeguard), `failureRate` (0.0–1.0), `latency` (`Duration?`), `exception` factory, and `injectResult` override.
+  - `DefaultChaosPolicy`: innermost wrapper that injects latency, random faults, or overridden return values. Zero overhead when `enabled = false` — no wrapper is installed.
+  - `ResilientBuilder.chaos { }` DSL function to configure chaos within a `resilient { }` block.
+  - `OrderablePolicyType.CHAOS` appended after `BULKHEAD` in the default composition order.
+  - Chaos is positioned as the innermost policy (wraps the user block directly) so it controls exactly what the block sees.
 
 ## [1.4.0] - 2026-03-22
 
