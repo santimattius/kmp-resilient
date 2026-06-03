@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+### Added
+- `CoroutineScope.asResilientScope()` — creates a child `ResilientScope` linked to an existing `CoroutineScope`. Cancelling the outer scope cancels all internal background jobs (cache cleanup, coalescing). Use with `viewModelScope` or `lifecycleScope` to eliminate manual `ResilientScope` lifecycle management.
+- `CoroutineScope.resilient(block)` — shorthand extension that wraps `.asResilientScope()` + `resilient(scope, block)` in one call.
+
 ## [1.4.0] - 2026-03-22
 
 ### Added
