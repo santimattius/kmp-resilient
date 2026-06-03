@@ -131,6 +131,24 @@ class CircuitBreakerConfig {
     var shouldRecordFailure: (Throwable) -> Boolean = { true }
     var onStateChange: (CircuitState) -> Unit = { }
     var slidingWindow: Duration? = null
+
+    /**
+     * Optional predicate evaluated after the block returns **without** throwing.
+     *
+     * When `null` (default), every non-exceptional return is treated as a success — zero regression.
+     * When set, the predicate receives the returned value (`Any?`). If it returns `true`, the call is
+     * counted as a failure (via the `onFailure` path) even though the block did not throw.
+     * The result is still returned to the caller unchanged.
+     *
+     * This predicate is **independent** of [shouldRecordFailure]: `shouldRecordFailure` governs the
+     * exception path; `shouldRecordResult` governs the success-value path.
+     *
+     * Example — treat HTTP 503 as a circuit-breaker failure:
+     * ```kotlin
+     * shouldRecordResult = { result -> result is ApiResponse && result.code == 503 }
+     * ```
+     */
+    var shouldRecordResult: ((Any?) -> Boolean)? = null
 }
 
 /**

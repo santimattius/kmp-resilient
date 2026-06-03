@@ -309,6 +309,7 @@ fun resilient(
             timeout = cfg.timeout
             halfOpenMaxCalls = cfg.halfOpenMaxCalls
             shouldRecordFailure = cfg.shouldRecordFailure
+            shouldRecordResult = cfg.shouldRecordResult
             slidingWindow = cfg.slidingWindow
             onStateChange = { state -> cfg.onStateChange(state) }
         }
