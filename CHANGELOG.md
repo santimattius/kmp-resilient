@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+### Added
+
+- **Retry — DecorrelatedJitterBackoff**
+  - New `DecorrelatedJitterBackoff(base: Duration, cap: Duration)` backoff strategy implementing `BackoffStrategy`.
+  - Uses a stateless approximation of the AWS decorrelated jitter formula: `min(cap, random(base, base * 3^(attempt-1)))`, safe for use across concurrent `execute()` calls on shared policy instances.
+  - Enforces `base > Duration.ZERO` and `cap >= base` at construction time; violating either throws `IllegalArgumentException`.
+  - Available in `commonMain` with no platform-specific dependencies.
+
 ## [1.4.0] - 2026-03-22
 
 ### Added
