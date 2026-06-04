@@ -122,6 +122,17 @@ enum class CircuitState {
  * this window are discarded. The circuit opens when at least [failureThreshold] failures fall inside the window.
  * Success in CLOSED only **prunes** expired failures (it does not clear recent failures). [HALF_OPEN][CircuitState.HALF_OPEN]
  * and [OPEN][CircuitState.OPEN] behavior is unchanged.
+ *
+ * @property failureRateThreshold When non-null, enables **failure-rate mode** using a count-based sliding window.
+ * The circuit opens when the failure rate (as a percentage, 0.0–100.0) computed over the last
+ * [minimumNumberOfCalls] outcomes meets or exceeds this value.
+ * The rate is not evaluated until [minimumNumberOfCalls] have been recorded.
+ * Cannot be combined with [slidingWindow]; setting both throws [IllegalArgumentException].
+ * Defaults to `null` (disabled).
+ *
+ * @property minimumNumberOfCalls Minimum number of calls that must be recorded before [failureRateThreshold]
+ * is evaluated. Acts as both the minimum-calls guard and the ring-buffer size. Defaults to `10`.
+ * Only meaningful when [failureRateThreshold] is non-null.
  */
 class CircuitBreakerConfig {
     var failureThreshold: Int = 5
@@ -131,6 +142,8 @@ class CircuitBreakerConfig {
     var shouldRecordFailure: (Throwable) -> Boolean = { true }
     var onStateChange: (CircuitState) -> Unit = { }
     var slidingWindow: Duration? = null
+    var failureRateThreshold: Double? = null
+    var minimumNumberOfCalls: Int = 10
 }
 
 /**

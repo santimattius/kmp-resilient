@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Circuit Breaker — failure-rate sliding window mode**
+  - `CircuitBreakerConfig.failureRateThreshold: Double?` (0.0–100.0, default `null`): enables count-based failure-rate mode. The circuit opens when the failure rate computed over the last `minimumNumberOfCalls` outcomes meets or exceeds this percentage.
+  - `CircuitBreakerConfig.minimumNumberOfCalls: Int` (default `10`): minimum number of call outcomes that must be recorded before the failure rate is evaluated. Also defines the ring-buffer window size.
+  - Setting both `failureRateThreshold` and `slidingWindow` in the same config throws `IllegalArgumentException`.
+  - Half-open recovery (`successThreshold`) and the existing consecutive-failure and time-based sliding-window modes are unchanged.
 - **Telemetry Export modules** *(new artifacts: `resilient-otel`, `resilient-micrometer`)*
   - `resilient-otel`: JVM-only module exporting `SharedFlow<ResilientEvent>` to OpenTelemetry counters via `exportToOpenTelemetry(meter, scope)`.
   - `resilient-micrometer`: JVM-only module exporting `SharedFlow<ResilientEvent>` to Micrometer counters via `exportToMicrometer(registry, scope)`.
