@@ -311,6 +311,8 @@ fun resilient(
             shouldRecordFailure = cfg.shouldRecordFailure
             shouldRecordResult = cfg.shouldRecordResult
             slidingWindow = cfg.slidingWindow
+            failureRateThreshold = cfg.failureRateThreshold
+            minimumNumberOfCalls = cfg.minimumNumberOfCalls
             onStateChange = { state -> cfg.onStateChange(state) }
         }
         DefaultCircuitBreaker(copy) { new, old ->

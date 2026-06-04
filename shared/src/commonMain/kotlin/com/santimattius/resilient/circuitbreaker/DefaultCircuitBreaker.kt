@@ -66,6 +66,13 @@ class DefaultCircuitBreaker(
                 "slidingWindow must be positive when set, got $w"
             }
         }
+        require(config.failureRateThreshold == null || config.slidingWindow == null) {
+            "Cannot combine failureRateThreshold with slidingWindow; choose one trip mode."
+        }
+        val frt = config.failureRateThreshold
+        require(frt == null || frt in 0.0..100.0) {
+            "failureRateThreshold must be in 0.0..100.0, got $frt"
+        }
     }
 
     /** When non-null, CLOSED failures are tracked in a time sliding window (ms). */
@@ -73,6 +80,13 @@ class DefaultCircuitBreaker(
         config.slidingWindow?.takeIf { it.isPositive() }?.inWholeMilliseconds
 
     private val failureTimestamps = ArrayDeque<Long>()
+
+    /**
+     * Ring buffer for failure-rate mode. Each entry is `true` (failure) or `false` (success).
+     * Capped at [CircuitBreakerConfig.minimumNumberOfCalls]; oldest entry evicted when full.
+     * Only populated when [CircuitBreakerConfig.failureRateThreshold] is non-null.
+     */
+    private val ringBuffer = ArrayDeque<Boolean>()
 
     private val mutex = Mutex()
     private val _state = MutableStateFlow(CircuitState.CLOSED)
@@ -273,11 +287,19 @@ class DefaultCircuitBreaker(
         mutex.withLock {
             when (_state.value) {
                 CircuitState.CLOSED -> {
-                    if (slidingWindowMs != null) {
-                        val now = getTimeMillis()
-                        pruneFailureTimestampsLocked(now)
-                    } else {
-                        failureCount = 0
+                    when {
+                        config.failureRateThreshold != null -> {
+                            // Failure-rate mode: record success and evaluate rate (buffer may now be full)
+                            recordOutcomeLocked(failure = false)
+                            evaluateFailureRateLocked()
+                        }
+                        slidingWindowMs != null -> {
+                            val now = getTimeMillis()
+                            pruneFailureTimestampsLocked(now)
+                        }
+                        else -> {
+                            failureCount = 0
+                        }
                     }
                 }
 
@@ -292,6 +314,7 @@ class DefaultCircuitBreaker(
                         successCount = 0
                         failureCount = 0
                         failureTimestamps.clear()
+                        ringBuffer.clear()
                     }
                 }
             }
@@ -318,18 +341,26 @@ class DefaultCircuitBreaker(
         mutex.withLock {
             when (_state.value) {
                 CircuitState.CLOSED -> {
-                    if (slidingWindowMs != null) {
-                        val now = getTimeMillis()
-                        pruneFailureTimestampsLocked(now)
-                        failureTimestamps.addLast(now)
-                        pruneFailureTimestampsLocked(now)
-                        if (failureTimestamps.size >= config.failureThreshold) {
-                            transitionOpenFor(config.timeout)
+                    when {
+                        config.failureRateThreshold != null -> {
+                            // Failure-rate mode: record failure in ring buffer and evaluate
+                            recordOutcomeLocked(failure = true)
+                            evaluateFailureRateLocked()
                         }
-                    } else {
-                        failureCount++
-                        if (failureCount >= config.failureThreshold) {
-                            transitionOpenFor(config.timeout)
+                        slidingWindowMs != null -> {
+                            val now = getTimeMillis()
+                            pruneFailureTimestampsLocked(now)
+                            failureTimestamps.addLast(now)
+                            pruneFailureTimestampsLocked(now)
+                            if (failureTimestamps.size >= config.failureThreshold) {
+                                transitionOpenFor(config.timeout)
+                            }
+                        }
+                        else -> {
+                            failureCount++
+                            if (failureCount >= config.failureThreshold) {
+                                transitionOpenFor(config.timeout)
+                            }
                         }
                     }
                 }
@@ -355,7 +386,40 @@ class DefaultCircuitBreaker(
         if (slidingWindowMs != null) {
             failureTimestamps.clear()
         }
+        // Ring buffer is intentionally NOT cleared here — it is cleared on CLOSED transition only
         transitionTo(CircuitState.OPEN)
+    }
+
+    /**
+     * Records a single outcome (success=false or failure=true) into [ringBuffer].
+     * Evicts the oldest entry when the buffer would exceed [CircuitBreakerConfig.minimumNumberOfCalls].
+     * Also updates [failureCount] to reflect the current number of failures in the buffer.
+     * Must be called with [mutex] held.
+     */
+    private fun recordOutcomeLocked(failure: Boolean) {
+        val capacity = config.minimumNumberOfCalls
+        if (ringBuffer.size >= capacity) {
+            val evicted = ringBuffer.removeFirst()
+            if (evicted) failureCount = maxOf(0, failureCount - 1)
+        }
+        ringBuffer.addLast(failure)
+        if (failure) failureCount++
+    }
+
+    /**
+     * Evaluates the current failure rate and opens the circuit if it meets or exceeds
+     * [CircuitBreakerConfig.failureRateThreshold]. Only acts when the ring buffer is full
+     * (i.e., [ringBuffer].size == [CircuitBreakerConfig.minimumNumberOfCalls]).
+     * Must be called with [mutex] held.
+     */
+    private fun evaluateFailureRateLocked() {
+        val threshold = config.failureRateThreshold ?: return
+        val capacity = config.minimumNumberOfCalls
+        if (ringBuffer.size < capacity) return
+        val rate = failureCount.toDouble() / capacity * 100.0
+        if (rate >= threshold) {
+            transitionOpenFor(config.timeout)
+        }
     }
 
     /** Must be called with [mutex] held. Updates [failureCount] to the number of timestamps in the window. */

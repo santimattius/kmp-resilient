@@ -12,6 +12,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Circuit Breaker — result-based failure recording**
   - `CircuitBreakerConfig.shouldRecordResult`: optional predicate `((Any?) -> Boolean)?` evaluated after the block returns without throwing. When `true`, the returned value counts as a failure (incrementing the failure counter and potentially opening the circuit) while the value is still returned to the caller unchanged. Default `null` preserves existing behaviour — zero regression.
   - This predicate is independent of `shouldRecordFailure`: `shouldRecordFailure` governs the exception path; `shouldRecordResult` governs the success-value path.
+- **Circuit Breaker — failure-rate sliding window mode**
+  - `CircuitBreakerConfig.failureRateThreshold: Double?` (0.0–100.0, default `null`): enables count-based failure-rate mode. The circuit opens when the failure rate computed over the last `minimumNumberOfCalls` outcomes meets or exceeds this percentage.
+  - `CircuitBreakerConfig.minimumNumberOfCalls: Int` (default `10`): minimum number of call outcomes that must be recorded before the failure rate is evaluated. Also defines the ring-buffer window size.
+  - Setting both `failureRateThreshold` and `slidingWindow` in the same config throws `IllegalArgumentException`.
+  - Half-open recovery (`successThreshold`) and the existing consecutive-failure and time-based sliding-window modes are unchanged.
+- **Telemetry Export modules** *(new artifacts: `resilient-otel`, `resilient-micrometer`)*
+  - `resilient-otel`: JVM-only module exporting `SharedFlow<ResilientEvent>` to OpenTelemetry counters via `exportToOpenTelemetry(meter, scope)`.
+  - `resilient-micrometer`: JVM-only module exporting `SharedFlow<ResilientEvent>` to Micrometer counters via `exportToMicrometer(registry, scope)`.
+  - Both APIs are `@ResilientExperimentalApi`. The returned `Job` gives callers full control over the export lifecycle: cancelling the job stops event collection.
+  - Metrics covered: `resilient.retry.attempts`, `resilient.circuit_breaker.state_changes`, `resilient.rate_limiter.limited`, `resilient.bulkhead.rejected`, `resilient.operation.success`, `resilient.operation.failure`, `resilient.cache.hits`, `resilient.cache.misses`, `resilient.timeout.triggered`, `resilient.hedging.used`, `resilient.fallback.triggered`.
+- `CoroutineScope.asResilientScope()` — creates a child `ResilientScope` linked to an existing `CoroutineScope`. Cancelling the outer scope cancels all internal background jobs (cache cleanup, coalescing). Use with `viewModelScope` or `lifecycleScope` to eliminate manual `ResilientScope` lifecycle management.
+- `CoroutineScope.resilient(block)` — shorthand extension that wraps `.asResilientScope()` + `resilient(scope, block)` in one call.
 
 ## [1.4.0] - 2026-03-22
 
