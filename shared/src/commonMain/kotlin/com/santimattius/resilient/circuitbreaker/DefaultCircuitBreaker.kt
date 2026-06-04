@@ -258,9 +258,15 @@ class DefaultCircuitBreaker(
         return try {
             val result = block()
             // Use NonCancellable to ensure state is updated even if coroutine is cancelled
-            // after block completes but before onSuccess is called
+            // after block completes but before onSuccess / onFailure is called.
             withContext(NonCancellable) {
-                onSuccess()
+                if (config.shouldRecordResult?.invoke(result) == true) {
+                    // Result matches the failure predicate: record as failure but still return
+                    // the value to the caller — do NOT throw.
+                    onResultFailure()
+                } else {
+                    onSuccess()
+                }
             }
             result
         } catch (e: CancellationException) {
@@ -315,9 +321,23 @@ class DefaultCircuitBreaker(
         }
     }
 
+    /**
+     * Records a failure triggered by [CircuitBreakerConfig.shouldRecordResult].
+     *
+     * Bypasses the [CircuitBreakerConfig.shouldRecordFailure] guard (which is only relevant for
+     * exception-based failures) and applies the same state-machine logic as [onFailure].
+     */
+    private suspend fun onResultFailure() {
+        recordFailureLocked()
+    }
+
     private suspend fun onFailure(t: Throwable) {
         if (!config.shouldRecordFailure(t)) return
+        recordFailureLocked()
+    }
 
+    /** Applies the failure state-machine update inside the mutex. */
+    private suspend fun recordFailureLocked() {
         mutex.withLock {
             when (_state.value) {
                 CircuitState.CLOSED -> {
