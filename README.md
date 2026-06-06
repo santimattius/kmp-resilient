@@ -539,3 +539,15 @@ Theoretical and technical deep-dive documentation for each pattern — definitio
 
 → [Full index with descriptions](docs/README.md)
 
+---
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding guidelines, and the pull request process.
+
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+
+This project is licensed under the [Apache License 2.0](LICENSE).
+
