@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & discussions
+    url: https://github.com/santimattius/kmp-resilient/discussions
+    about: Ask questions or share ideas that are not bug reports or feature requests
+  - name: Documentation
+    url: https://github.com/santimattius/kmp-resilient/tree/main/docs
+    about: Read pattern documentation and usage guides
