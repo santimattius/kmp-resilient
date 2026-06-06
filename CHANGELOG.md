@@ -31,6 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Half-open recovery (`successThreshold`) and the existing consecutive-failure and time-based sliding-window modes are unchanged.
 - `CoroutineScope.asResilientScope()` — creates a child `ResilientScope` linked to an existing `CoroutineScope`. Cancelling the outer scope cancels all internal background jobs (cache cleanup, coalescing). Use with `viewModelScope` or `lifecycleScope` to eliminate manual `ResilientScope` lifecycle management.
 - `CoroutineScope.resilient(block)` — shorthand extension that wraps `.asResilientScope()` + `resilient(scope, block)` in one call.
+- **RateLimiterRegistry**
+  - `RateLimiterRegistry` for named, shared rate-limiter instances so multiple policies can share the same token-bucket quota (e.g. all `"payments"` calls consume from the same pool).
+  - `getOrCreate(name, configure, onRateLimited?)` follows a first-name-wins contract: the first call for a given name creates the limiter; subsequent calls return the same instance and ignore the configure block. Not synchronized across threads (startup-time construct, matching `BulkheadRegistry` contract).
+  - `ResilientBuilder.rateLimiterNamed(registry, name, configure)` DSL — mutually exclusive with `rateLimiter { }`. Throws `IllegalArgumentException` at build time if both are configured.
 
 ## [1.4.0] - 2026-03-22
 

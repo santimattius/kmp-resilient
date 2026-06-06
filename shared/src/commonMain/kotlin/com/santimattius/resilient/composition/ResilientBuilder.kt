@@ -20,6 +20,7 @@ import com.santimattius.resilient.hedging.DefaultHedgingPolicy
 import com.santimattius.resilient.hedging.HedgingConfig
 import com.santimattius.resilient.ratelimiter.DefaultRateLimiter
 import com.santimattius.resilient.ratelimiter.RateLimiterConfig
+import com.santimattius.resilient.ratelimiter.RateLimiterRegistry
 import com.santimattius.resilient.retry.DefaultRetryPolicy
 import com.santimattius.resilient.retry.RetryPolicyConfig
 import com.santimattius.resilient.PolicyHealthSnapshot
@@ -54,6 +55,15 @@ internal data class CircuitBreakerNamedSpec(
     val registry: CircuitBreakerRegistry,
     val name: String,
     val configure: CircuitBreakerConfig.() -> Unit
+)
+
+/**
+ * Named rate-limiter request: resolved at [resilient] build time via [RateLimiterRegistry.getOrCreate].
+ */
+internal data class RateLimiterNamedSpec(
+    val registry: RateLimiterRegistry,
+    val name: String,
+    val configure: RateLimiterConfig.() -> Unit
 )
 
 /**
@@ -96,6 +106,7 @@ class ResilientBuilder {
     internal var circuitBreakerConfig: CircuitBreakerConfig? = null
     internal var circuitBreakerNamedSpec: CircuitBreakerNamedSpec? = null
     internal var rateLimiterConfig: RateLimiterConfig? = null
+    internal var rateLimiterNamedSpec: RateLimiterNamedSpec? = null
     internal var bulkheadConfig: BulkheadConfig? = null
     internal var bulkheadNamedSpec: BulkheadNamedSpec? = null
     internal var timeoutConfig: TimeoutConfig? = null
@@ -160,7 +171,31 @@ class ResilientBuilder {
      * @param config Lambda to configure [RateLimiterConfig] (e.g. maxCalls, period).
      */
     fun rateLimiter(config: RateLimiterConfig.() -> Unit) {
+        require(rateLimiterNamedSpec == null) {
+            "Cannot use rateLimiter { } together with rateLimiterNamed(...); choose one."
+        }
         rateLimiterConfig = (rateLimiterConfig ?: RateLimiterConfig()).apply(config)
+    }
+
+    /**
+     * Uses a shared [DefaultRateLimiter] from [registry] keyed by [name].
+     * Multiple policies can pass the same [RateLimiterRegistry] and name to enforce a **global** quota
+     * across those policies.
+     *
+     * Cannot be combined with [rateLimiter] in the same builder.
+     */
+    fun rateLimiterNamed(
+        registry: RateLimiterRegistry,
+        name: String,
+        configure: RateLimiterConfig.() -> Unit
+    ) {
+        require(rateLimiterConfig == null) {
+            "Cannot use rateLimiterNamed(...) together with rateLimiter { }; choose one."
+        }
+        require(rateLimiterNamedSpec == null) {
+            "rateLimiterNamed(...) can only be configured once per policy."
+        }
+        rateLimiterNamedSpec = RateLimiterNamedSpec(registry, name, configure)
     }
 
     /**
@@ -373,7 +408,11 @@ fun resilient(
         }
     }
 
-    val rateLimiter = builder.rateLimiterConfig?.let { cfg ->
+    val rateLimiter = builder.rateLimiterNamedSpec?.let { spec ->
+        spec.registry.getOrCreate(spec.name, spec.configure) { wait ->
+            events.emit(ResilientEvent.RateLimited(wait))
+        }
+    } ?: builder.rateLimiterConfig?.let { cfg ->
         DefaultRateLimiter(
             config = cfg,
             onRateLimited = { wait ->
