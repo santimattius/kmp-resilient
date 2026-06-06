@@ -138,6 +138,51 @@ class FixedBackoff(
     }
 }
 
+/**
+ * A stateless implementation of the AWS decorrelated jitter backoff strategy.
+ *
+ * The delay for each attempt is computed as:
+ * `min(cap, random(base, base * 3^(attempt-1)))`
+ *
+ * This formula approximates the AWS decorrelated jitter pattern without requiring
+ * mutable per-instance state, making it safe to share across concurrent executions.
+ *
+ * @property base The minimum possible delay. Must be positive.
+ * @property cap The maximum possible delay. Must be >= [base].
+ * @throws IllegalArgumentException if [base] is not positive or if [cap] < [base].
+ */
+class DecorrelatedJitterBackoff(
+    val base: Duration,
+    val cap: Duration,
+) : BackoffStrategy {
+
+    init {
+        require(base > Duration.ZERO) { "base must be positive, got $base" }
+        require(cap >= base) { "cap must be >= base, but cap=$cap < base=$base" }
+    }
+
+    /**
+     * Computes the delay in milliseconds for the given [attempt] (1-based).
+     * The result is always in the range [[base], [cap]].
+     * Exposed as an internal function to allow unit-testing the pure calculation.
+     */
+    internal fun computeDelayMs(attempt: Int): Long {
+        val baseMs = base.inWholeMilliseconds
+        val capMs = cap.inWholeMilliseconds
+        val upperBound = (baseMs * JITTER_MULTIPLIER.powSafe(attempt - 1)).toLong().coerceIn(baseMs, capMs)
+        return if (baseMs >= upperBound) baseMs else Random.nextLong(baseMs, upperBound + 1)
+    }
+
+    private companion object {
+        /** AWS decorrelated-jitter multiplier: upper bound grows as 3^(attempt-1). */
+        const val JITTER_MULTIPLIER = 3.0
+    }
+
+    override suspend fun delay(attempt: Int) {
+        delay(computeDelayMs(attempt).milliseconds)
+    }
+}
+
 private fun Double.powSafe(exp: Int): Double {
     var result = 1.0
     repeat(exp.coerceAtLeast(0)) { result *= this }
