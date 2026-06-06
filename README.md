@@ -285,6 +285,45 @@ val policy = resilient(scope) {
 }
 ```
 
+### CoroutineScope Binding
+
+By default you pass a `ResilientScope` explicitly. When working inside a framework that already manages a `CoroutineScope` (e.g. `viewModelScope`, `lifecycleScope`, `rememberCoroutineScope`), you can bind the policy lifecycle directly to that scope — no manual `ResilientScope` creation or `policy.close()` needed.
+
+**`CoroutineScope.asResilientScope()`** — wraps an existing scope as a `ResilientScope`. Cancelling the outer scope automatically cancels all internal background jobs (cache cleanup, coalescing deduplication):
+
+```kotlin
+import com.santimattius.resilient.composition.asResilientScope
+
+// Android ViewModel
+class ProfileViewModel : ViewModel() {
+    private val scope  = viewModelScope.asResilientScope()
+    private val policy = resilient(scope) {
+        cache { key = "profile"; ttl = 60.seconds }
+        retry { maxAttempts = 3 }
+    }
+    // When the ViewModel is cleared, viewModelScope is cancelled → scope and all policy
+    // background jobs are cancelled automatically. No policy.close() needed.
+}
+```
+
+**`CoroutineScope.resilient { }`** — shorthand that combines `.asResilientScope()` and `resilient(scope) { }` in one call:
+
+```kotlin
+import com.santimattius.resilient.composition.resilient
+
+class ProfileViewModel : ViewModel() {
+    private val policy = viewModelScope.resilient {
+        cache { key = "profile"; ttl = 60.seconds }
+        retry { maxAttempts = 3 }
+    }
+}
+```
+
+**Lifecycle contract:**
+- When the outer `CoroutineScope` is cancelled → the derived scope and all its background jobs are cancelled automatically via structured concurrency.
+- Calling `policy.close()` stops only the internal policy jobs — it does **not** cancel the outer scope.
+- Do not call these on an already-cancelled scope; internal coroutine launches will fail with `CancellationException`.
+
 ### Health / Readiness
 Use `policy.getHealthSnapshot()` to build health or readiness endpoints (e.g. Kubernetes probes, `/health` API). The snapshot includes circuit breaker state, bulkhead usage, rate limiter quota, retry config, and cache stats when the corresponding policies are configured.
 ```kotlin

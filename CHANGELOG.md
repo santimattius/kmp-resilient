@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+---
+
+## [1.5.0] - 2026-06-06
+
 ### Added
 
 - **Retry — DecorrelatedJitterBackoff**
@@ -40,6 +44,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - `RateLimiterRegistry` for named, shared rate-limiter instances so multiple policies can share the same token-bucket quota (e.g. all `"payments"` calls consume from the same pool).
   - `getOrCreate(name, configure, onRateLimited?)` follows a first-name-wins contract: the first call for a given name creates the limiter; subsequent calls return the same instance and ignore the configure block. Not synchronized across threads (startup-time construct, matching `BulkheadRegistry` contract).
   - `ResilientBuilder.rateLimiterNamed(registry, name, configure)` DSL — mutually exclusive with `rateLimiter { }`. Throws `IllegalArgumentException` at build time if both are configured.
+- **resilient-test — FaultInjector: deterministic `failCount`**
+  - `FaultInjector.Builder.failCount(n: Int)`: fails the first `n` calls deterministically, then always succeeds. Takes precedence over `failureRate` when > 0.
+  - Preferred over `failureRate` for unit tests — eliminates probabilistic flakiness (e.g. `failureRate(0.6)` with `maxAttempts = 5` had a ~7.8% chance of exhausting all retries).
 
 ## [1.4.0] - 2026-03-22
 
@@ -181,6 +188,7 @@ Planned items: cache (dynamic key, invalidation), timeout (documentation and per
 
 ---
 
+[1.5.0]: https://github.com/santimattius/kmp-resilient/compare/1.4.0...1.5.0
 [1.4.0]: https://github.com/santimattius/kmp-resilient/compare/1.3.0...1.4.0
 [1.3.0-ALPHA01]: https://github.com/santimattius/kmp-resilient/compare/1.2.0...1.3.0-ALPHA01
 [1.2.0]: https://github.com/santimattius/kmp-resilient/compare/1.1.0...1.2.0
