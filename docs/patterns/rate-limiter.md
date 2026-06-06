@@ -127,6 +127,42 @@ val policy = resilient {
 
 ---
 
+## Named / Shared Rate Limiter (RateLimiterRegistry)
+
+By default each `resilient { }` policy owns its own token bucket. When multiple call sites target the same downstream API (e.g. different repositories calling the same `"payments"` endpoint) you want a **single shared quota** so that calls from any caller consume from the same pool.
+
+Use `RateLimiterRegistry` for this:
+
+```kotlin
+import com.santimattius.resilient.ratelimiter.RateLimiterRegistry
+import kotlin.time.Duration.Companion.seconds
+
+val rateLimiters = RateLimiterRegistry()
+
+val policyA = resilient(scope) {
+    rateLimiterNamed(rateLimiters, "payments") {
+        maxCalls = 10
+        period   = 1.seconds
+    }
+}
+
+val policyB = resilient(scope) {
+    rateLimiterNamed(rateLimiters, "payments") {
+        // First registration wins — this configure block is ignored
+        maxCalls = 10
+    }
+}
+
+// 10 calls through policyA exhaust the shared quota; policyB's next call is rejected
+```
+
+**Contract:**
+- First-name-wins: the first call to `getOrCreate("payments", configure)` creates the limiter; subsequent calls with the same name return the same instance and ignore `configure`.
+- The registry is **not thread-safe** — it is intended as a startup-time construct, created once before any coroutine uses it (same contract as `BulkheadRegistry`).
+- `rateLimiterNamed` and `rateLimiter { }` are mutually exclusive in the same builder; combining both throws `IllegalArgumentException`.
+
+---
+
 ## Observing Rate Limiter Events
 
 ```kotlin
