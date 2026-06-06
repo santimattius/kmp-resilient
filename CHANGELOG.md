@@ -14,6 +14,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Uses a stateless approximation of the AWS decorrelated jitter formula: `min(cap, random(base, base * 3^(attempt-1)))`, safe for use across concurrent `execute()` calls on shared policy instances.
   - Enforces `base > Duration.ZERO` and `cap >= base` at construction time; violating either throws `IllegalArgumentException`.
   - Available in `commonMain` with no platform-specific dependencies.
+- **Richer PolicyHealthSnapshot**
+  - `RateLimiterSnapshot(remainingCalls: Int, timeToRefill: Duration)` — exposes current token count and time until the next bucket refill.
+  - `RetrySnapshot(maxAttempts: Int)` — exposes the configured maximum attempt count.
+  - `CacheSnapshot(entryCount: Int, hitRate: Double)` — exposes current cache entry count and cumulative hit rate (`Double.NaN` when no calls have been made yet).
+  - `PolicyHealthSnapshot` gains three nullable trailing fields (`rateLimiter`, `retry`, `cache`) with `null` defaults — source-compatible with existing consumers.
+  - `DefaultRateLimiter.snapshot()` reads `@Volatile` token state for a non-blocking, approximation-safe snapshot.
+  - `DefaultRetryPolicy.snapshot()` reflects the immutable `maxAttempts` configuration.
+  - `InMemoryCachePolicy` tracks cumulative `hitCount` and `missCount` (written under the internal mutex); `snapshot()` computes `hitRate` from those counters as an approximation suitable for health endpoints.
+- **CircuitBreakerRegistry**
+  - `CircuitBreakerRegistry` for named, shared circuit breaker instances so multiple policies can share the same breaker state (e.g. all calls to `"payments"` trip a single breaker).
+  - `ResilientBuilder.circuitBreakerNamed(registry, name, config)` DSL — mutually exclusive with `circuitBreaker { }`.
+- **Telemetry note:** only the first policy that registers a name in the registry receives `CircuitStateChanged` telemetry events via its `events` SharedFlow. Subsequent policies reusing the same entry share the breaker state but not its telemetry callback. Observe shared state directly via `DefaultCircuitBreaker.state`.
+- **Circuit Breaker — result-based failure recording**
+  - `CircuitBreakerConfig.shouldRecordResult`: optional predicate `((Any?) -> Boolean)?` evaluated after the block returns without throwing. When `true`, the returned value counts as a failure (incrementing the failure counter and potentially opening the circuit) while the value is still returned to the caller unchanged. Default `null` preserves existing behaviour — zero regression.
+  - This predicate is independent of `shouldRecordFailure`: `shouldRecordFailure` governs the exception path; `shouldRecordResult` governs the success-value path.
+- **Circuit Breaker — failure-rate sliding window mode**
+  - `CircuitBreakerConfig.failureRateThreshold: Double?` (0.0–100.0, default `null`): enables count-based failure-rate mode. The circuit opens when the failure rate computed over the last `minimumNumberOfCalls` outcomes meets or exceeds this percentage.
+  - `CircuitBreakerConfig.minimumNumberOfCalls: Int` (default `10`): minimum number of call outcomes that must be recorded before the failure rate is evaluated. Also defines the ring-buffer window size.
+  - Setting both `failureRateThreshold` and `slidingWindow` in the same config throws `IllegalArgumentException`.
+  - Half-open recovery (`successThreshold`) and the existing consecutive-failure and time-based sliding-window modes are unchanged.
+- `CoroutineScope.asResilientScope()` — creates a child `ResilientScope` linked to an existing `CoroutineScope`. Cancelling the outer scope cancels all internal background jobs (cache cleanup, coalescing). Use with `viewModelScope` or `lifecycleScope` to eliminate manual `ResilientScope` lifecycle management.
+- `CoroutineScope.resilient(block)` — shorthand extension that wraps `.asResilientScope()` + `resilient(scope, block)` in one call.
+- **RateLimiterRegistry**
+  - `RateLimiterRegistry` for named, shared rate-limiter instances so multiple policies can share the same token-bucket quota (e.g. all `"payments"` calls consume from the same pool).
+  - `getOrCreate(name, configure, onRateLimited?)` follows a first-name-wins contract: the first call for a given name creates the limiter; subsequent calls return the same instance and ignore the configure block. Not synchronized across threads (startup-time construct, matching `BulkheadRegistry` contract).
+  - `ResilientBuilder.rateLimiterNamed(registry, name, configure)` DSL — mutually exclusive with `rateLimiter { }`. Throws `IllegalArgumentException` at build time if both are configured.
 
 ## [1.4.0] - 2026-03-22
 
