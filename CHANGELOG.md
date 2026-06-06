@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - `PolicyHealthSnapshot` gains three nullable trailing fields (`rateLimiter`, `retry`, `cache`) with `null` defaults — source-compatible with existing consumers.
   - `DefaultRateLimiter.snapshot()` reads `@Volatile` token state for a non-blocking, approximation-safe snapshot.
   - `DefaultRetryPolicy.snapshot()` reflects the immutable `maxAttempts` configuration.
-  - `InMemoryCachePolicy` tracks cumulative `hitCount` and `missCount` via `@Volatile` counters; `snapshot()` computes `hitRate` from those counters.
+  - `InMemoryCachePolicy` tracks cumulative `hitCount` and `missCount` (written under the internal mutex); `snapshot()` computes `hitRate` from those counters as an approximation suitable for health endpoints.
 - **CircuitBreakerRegistry**
   - `CircuitBreakerRegistry` for named, shared circuit breaker instances so multiple policies can share the same breaker state (e.g. all calls to `"payments"` trip a single breaker).
   - `ResilientBuilder.circuitBreakerNamed(registry, name, config)` DSL — mutually exclusive with `circuitBreaker { }`.

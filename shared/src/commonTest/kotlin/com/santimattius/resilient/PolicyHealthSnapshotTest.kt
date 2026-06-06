@@ -123,15 +123,18 @@ class PolicyHealthSnapshotTest {
             }
 
             // 8 misses (unique keys 0..7)
+            // Explicit type annotation forces T=String on all targets (Kotlin/Native requires
+            // explicit T when the result is discarded to avoid inferring T=Unit)
             repeat(8) { i ->
                 callKey = "key-$i"
-                policy.execute { "v$i" }
+                val result: String = policy.execute { "v$i" }
+                assertEquals("v$i", result)
             }
-            // 2 hits (revisit key-0 and key-1)
+            // 2 hits (revisit key-0 and key-1) — cache returns the stored value
             callKey = "key-0"
-            policy.execute { "hit0" }
+            assertEquals("v0", policy.execute { "hit0" })
             callKey = "key-1"
-            policy.execute { "hit1" }
+            assertEquals("v1", policy.execute { "hit1" })
 
             // then: 2 hits, 8 misses → hitRate = 2/10 = 0.2
             val snap = policy.getHealthSnapshot()
