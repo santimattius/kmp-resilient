@@ -10,7 +10,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -127,10 +126,7 @@ internal class InMemoryCachePolicy(
     private val mutex = Mutex()
     private var sweeperJob: Job? = null
 
-    @Volatile
     private var hitCount: Long = 0L
-
-    @Volatile
     private var missCount: Long = 0L
 
     init {
@@ -165,8 +161,8 @@ internal class InMemoryCachePolicy(
             }
 
             ongoing.getOrPut(key) {
+                missCount++
                 async {
-                    missCount++
                     onCacheMiss?.invoke(key)
                     block()
                 }
@@ -209,8 +205,9 @@ internal class InMemoryCachePolicy(
     /**
      * Returns a point-in-time snapshot of cache state.
      *
-     * **Thread-safety note:** [hitCount] and [missCount] are read from `@Volatile` fields; [store.size]
-     * is read without holding [mutex]. The combination is an approximation suitable for health endpoints.
+     * **Thread-safety note:** [hitCount] and [missCount] are written under [mutex] but read here without
+     * holding it; [store.size] is also read without [mutex]. The combination is an approximation suitable
+     * for health endpoints.
      */
     fun snapshot(): CacheSnapshot {
         val hits = hitCount
