@@ -17,6 +17,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - `DefaultRateLimiter.snapshot()` reads `@Volatile` token state for a non-blocking, approximation-safe snapshot.
   - `DefaultRetryPolicy.snapshot()` reflects the immutable `maxAttempts` configuration.
   - `InMemoryCachePolicy` tracks cumulative `hitCount` and `missCount` via `@Volatile` counters; `snapshot()` computes `hitRate` from those counters.
+- **CircuitBreakerRegistry**
+  - `CircuitBreakerRegistry` for named, shared circuit breaker instances so multiple policies can share the same breaker state (e.g. all calls to `"payments"` trip a single breaker).
+  - `ResilientBuilder.circuitBreakerNamed(registry, name, config)` DSL — mutually exclusive with `circuitBreaker { }`.
+- **Telemetry note:** only the first policy that registers a name in the registry receives `CircuitStateChanged` telemetry events via its `events` SharedFlow. Subsequent policies reusing the same entry share the breaker state but not its telemetry callback. Observe shared state directly via `DefaultCircuitBreaker.state`.
+- **Circuit Breaker — result-based failure recording**
+  - `CircuitBreakerConfig.shouldRecordResult`: optional predicate `((Any?) -> Boolean)?` evaluated after the block returns without throwing. When `true`, the returned value counts as a failure (incrementing the failure counter and potentially opening the circuit) while the value is still returned to the caller unchanged. Default `null` preserves existing behaviour — zero regression.
+  - This predicate is independent of `shouldRecordFailure`: `shouldRecordFailure` governs the exception path; `shouldRecordResult` governs the success-value path.
+- **Circuit Breaker — failure-rate sliding window mode**
+  - `CircuitBreakerConfig.failureRateThreshold: Double?` (0.0–100.0, default `null`): enables count-based failure-rate mode. The circuit opens when the failure rate computed over the last `minimumNumberOfCalls` outcomes meets or exceeds this percentage.
+  - `CircuitBreakerConfig.minimumNumberOfCalls: Int` (default `10`): minimum number of call outcomes that must be recorded before the failure rate is evaluated. Also defines the ring-buffer window size.
+  - Setting both `failureRateThreshold` and `slidingWindow` in the same config throws `IllegalArgumentException`.
+  - Half-open recovery (`successThreshold`) and the existing consecutive-failure and time-based sliding-window modes are unchanged.
+- `CoroutineScope.asResilientScope()` — creates a child `ResilientScope` linked to an existing `CoroutineScope`. Cancelling the outer scope cancels all internal background jobs (cache cleanup, coalescing). Use with `viewModelScope` or `lifecycleScope` to eliminate manual `ResilientScope` lifecycle management.
+- `CoroutineScope.resilient(block)` — shorthand extension that wraps `.asResilientScope()` + `resilient(scope, block)` in one call.
 
 ## [1.4.0] - 2026-03-22
 
