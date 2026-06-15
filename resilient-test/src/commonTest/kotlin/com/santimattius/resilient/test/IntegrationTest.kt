@@ -23,7 +23,7 @@ class IntegrationTest {
         )
 
         val injector = FaultInjector.builder()
-            .failureRate(0.6) // 60% failure rate
+            .failCount(3) // fail first 3 calls, succeed on 4th
             .build()
 
         var attempts = 0
@@ -35,7 +35,7 @@ class IntegrationTest {
         }
 
         assertEquals("success after retries", result)
-        assertTrue(attempts >= 1, "Expected at least 1 attempt")
+        assertEquals(4, attempts, "Expected exactly 4 attempts (3 failures + 1 success)")
     }
 
     @Test

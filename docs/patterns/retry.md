@@ -29,8 +29,9 @@ Retry must always be paired with a **shouldRetry predicate** to avoid amplifying
 | `ExponentialBackoff` | `delay = min(maxDelay, initialDelay × factor^(attempt−1))` | General purpose. Reduces contention by spreading retries apart. |
 | `LinearBackoff` | `delay = initialDelay × attempt` | When linear growth in wait time is preferable. |
 | `FixedBackoff` | `delay = constant` | When the downstream recovery time is predictable. |
+| `DecorrelatedJitterBackoff` | `delay = min(cap, random(base, prevDelay × 3))` | AWS-style decorrelated jitter. Breaks synchronized retry waves across many concurrent callers. |
 
-`ExponentialBackoff` supports **jitter** (randomized ±delay), which is strongly recommended in high-concurrency scenarios to prevent *retry storms* where many callers retry at exactly the same moment.
+`ExponentialBackoff` supports **jitter** (randomized ±delay), which is strongly recommended in high-concurrency scenarios to prevent *retry storms* where many callers retry at exactly the same moment. `DecorrelatedJitterBackoff` takes this further by decorrelating each caller's delay sequence from every other caller's.
 
 ---
 
@@ -114,6 +115,30 @@ val policy = resilient {
 }
 // Total wall-clock time: up to (3 × 2 s) + back-off delays
 ```
+
+### DecorrelatedJitterBackoff
+
+Use when many concurrent callers retry the same endpoint and you want to prevent them from synchronizing their retry waves. Each caller's delay sequence is independent of every other caller's.
+
+```kotlin
+import com.santimattius.resilient.retry.DecorrelatedJitterBackoff
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+
+val policy = resilient {
+    retry {
+        maxAttempts     = 4
+        backoffStrategy = DecorrelatedJitterBackoff(
+            base = 100.milliseconds,   // minimum possible delay (and first-attempt seed)
+            cap  = 10.seconds          // maximum possible delay
+        )
+    }
+}
+```
+
+The formula is `min(cap, random(base, previousDelay × 3))`. Unlike `ExponentialBackoff` with jitter, the random range itself grows with each attempt, producing a wider spread across concurrent callers.
+
+`base` must be positive and `cap >= base`; violating either throws `IllegalArgumentException`.
 
 ### With a metrics callback
 
