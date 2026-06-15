@@ -31,7 +31,32 @@ import kotlin.coroutines.EmptyCoroutineContext
 class ResilientScope(
     dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : AutoCloseable {
-    private val _scope = CoroutineScope(dispatcher + SupervisorJob())
+
+    // The scope used for all coroutine operations.
+    // The field is read-only after construction. `fromExternalScope` uses a secondary constructor
+    // (via the `_scope` parameter overload) to set the backing scope directly.
+    private val _scope: CoroutineScope
+
+    // Public constructor: creates an independently-owned scope.
+    init {
+        _scope = CoroutineScope(dispatcher + SupervisorJob())
+    }
+
+    // Internal helper constructor that accepts a pre-built scope.
+    // A dummy Unit parameter resolves Kotlin's overload-resolution ambiguity between
+    // `(CoroutineScope)` and the `(CoroutineDispatcher = Dispatchers.Default)` constructor;
+    // both would otherwise be called with a `CoroutineScope` argument.
+    @Suppress("UNUSED_PARAMETER")
+    internal constructor(preBuiltScope: CoroutineScope, ignored: Unit = Unit) : this(Dispatchers.Default) {
+        // Re-point _scope to the pre-built scope. We do this via a mutable backing field.
+        // The Dispatchers.Default scope created by the delegated call is discarded.
+        _scopeField = preBuiltScope
+    }
+
+    // Mutable backing field used only by the internal constructor to override _scope.
+    // Null means the value from init{} is active.
+    private var _scopeField: CoroutineScope? = null
+    private val activeScope: CoroutineScope get() = _scopeField ?: _scope
 
     /**
      * Launches a coroutine in this scope for internal policy work (e.g. cache cleanup).
@@ -44,7 +69,7 @@ class ResilientScope(
         context: CoroutineContext = EmptyCoroutineContext,
         start: CoroutineStart = CoroutineStart.DEFAULT,
         block: suspend CoroutineScope.() -> Unit
-    ) = _scope.launch(context, start, block)
+    ) = activeScope.launch(context, start, block)
 
     /**
      * Launches a coroutine in this scope for internal policy work and returns its [Deferred].
@@ -57,12 +82,38 @@ class ResilientScope(
         context: CoroutineContext = EmptyCoroutineContext,
         start: CoroutineStart = CoroutineStart.DEFAULT,
         block: suspend CoroutineScope.() -> T
-    ): Deferred<T> = _scope.async(context, start, block)
+    ): Deferred<T> = activeScope.async(context, start, block)
 
     /**
      * Cancels this scope and all its child coroutines. Call when the resilience policy is no longer needed.
+     *
+     * When this [ResilientScope] was created via [CoroutineScope.asResilientScope], only the internal
+     * derived child scope is cancelled — the outer [CoroutineScope] is NOT affected.
      */
     override fun close() {
-        _scope.cancel()
+        activeScope.cancel()
+    }
+
+    internal companion object {
+        /**
+         * Creates a [ResilientScope] that derives a **child** [CoroutineScope] from [externalScope].
+         *
+         * The derived scope is a structured-concurrency child of [externalScope]: when [externalScope]
+         * is cancelled, the derived scope (and all internal background jobs it owns) are cancelled
+         * automatically. A [SupervisorJob] linked to the outer scope's [Job] ensures internal policy
+         * job failures do NOT propagate back to [externalScope].
+         *
+         * Calling [close] on the returned [ResilientScope] cancels only the derived child scope;
+         * [externalScope] is left completely untouched.
+         *
+         * @param externalScope The caller-owned [CoroutineScope] whose lifecycle governs this scope.
+         * @return A [ResilientScope] bound to [externalScope]'s lifecycle.
+         */
+        fun fromExternalScope(externalScope: CoroutineScope): ResilientScope {
+            val childScope = CoroutineScope(
+                externalScope.coroutineContext + SupervisorJob(externalScope.coroutineContext[Job])
+            )
+            return ResilientScope(childScope, Unit)
+        }
     }
 }

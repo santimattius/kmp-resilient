@@ -1,0 +1,69 @@
+name: Bug report
+description: Report incorrect behavior, a crash, or a regression
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much detail as you can.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: Describe what you expected vs. what actually happened.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal code or steps that reproduce the issue.
+      render: kotlin
+      placeholder: |
+        val policy = resilient { ... }
+        runTest { ... }
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Library version
+      description: Version of `io.github.santimattius.resilient:resilient` (or commit SHA if using main).
+      placeholder: "1.5.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Where did the issue occur?
+      multiple: true
+      options:
+        - JVM
+        - Android
+        - iOS / Native
+        - JS (browser)
+        - JS (Node.js)
+        - macOS (Native)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: kotlin-version
+    attributes:
+      label: Kotlin / coroutines versions (optional)
+      placeholder: "Kotlin 2.3.20, kotlinx-coroutines 1.10.2"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Stack traces, logs, related issues, or screenshots.
+      render: shell

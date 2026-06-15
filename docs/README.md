@@ -1,6 +1,6 @@
 # Resilience Patterns — Reference Index
 
-This reference covers the eight resilience patterns provided by the **Resilient** library. Each document includes a theoretical definition, guidance on when to apply the pattern, and concrete examples using the `resilient { }` DSL.
+This reference covers the resilience patterns provided by the **Resilient** library. Each document includes a theoretical definition, guidance on when to apply the pattern, and concrete examples using the `resilient { }` DSL.
 
 ---
 
@@ -11,7 +11,7 @@ This reference covers the eight resilience patterns provided by the **Resilient*
 | [Timeout](#timeout) | Aborts an operation that exceeds a maximum duration. | [timeout.md](patterns/timeout.md) |
 | [Retry](#retry) | Re-executes a failing operation with configurable back-off strategies. | [retry.md](patterns/retry.md) |
 | [Circuit Breaker](#circuit-breaker) | Stops sending requests to a failing dependency to allow it to recover. | [circuit-breaker.md](patterns/circuit-breaker.md) |
-| [Rate Limiter](#rate-limiter) | Caps the call rate to a downstream resource within a sliding window. | [rate-limiter.md](patterns/rate-limiter.md) |
+| [Rate Limiter](#rate-limiter) | Caps the call rate to a downstream resource within a time window. | [rate-limiter.md](patterns/rate-limiter.md) |
 | [Bulkhead](#bulkhead) | Limits concurrent executions to isolate resource exhaustion. | [bulkhead.md](patterns/bulkhead.md) |
 | [Hedging](#hedging) | Launches redundant parallel attempts and returns the first success. | [hedging.md](patterns/hedging.md) |
 | [Cache](#cache) | Stores successful results with a TTL to avoid redundant calls. | [cache.md](patterns/cache.md) |
@@ -29,28 +29,28 @@ Enforces a hard deadline on any suspend operation. If the block does not complet
 ---
 
 ### Retry
-Automatically re-executes a block on failure, waiting between attempts according to a back-off strategy (Exponential, Linear, or Fixed). A `shouldRetry` predicate lets you distinguish transient errors (network, 5xx) from permanent ones (4xx) so you never amplify bad requests. An optional `perAttemptTimeout` gives each attempt its own deadline.
+Automatically re-executes a block on failure, waiting between attempts according to a back-off strategy. Supported strategies: `ExponentialBackoff` (with optional jitter), `LinearBackoff`, `FixedBackoff`, and `DecorrelatedJitterBackoff` (AWS-style decorrelated jitter for high-concurrency scenarios). A `shouldRetry` predicate lets you distinguish transient errors (network, 5xx) from permanent ones (4xx). An optional `perAttemptTimeout` gives each attempt its own deadline. `shouldRetryResult` triggers a retry even when the block succeeds but the returned value is not acceptable (e.g. HTTP 202, empty body).
 
 → [Read full documentation](patterns/retry.md)
 
 ---
 
 ### Circuit Breaker
-A three-state finite-state machine (CLOSED → OPEN → HALF_OPEN) that monitors failure rates and, once a threshold is crossed, short-circuits all calls for a configurable recovery period. This prevents a cascade of timeouts from overwhelming a struggling dependency and gives it time to heal.
+A three-state finite-state machine (CLOSED → OPEN → HALF_OPEN) that monitors failure rates and, once a threshold is crossed, short-circuits all calls for a configurable recovery period. Supports three trip modes: **consecutive failures** (default), **time-based sliding window**, and **failure-rate ring buffer** (`failureRateThreshold`). `shouldRecordResult` allows counting successful return values as failures — useful when the downstream signals errors inside HTTP 200 responses. `CircuitBreakerRegistry` lets multiple policies share a single breaker instance for the same downstream.
 
 → [Read full documentation](patterns/circuit-breaker.md)
 
 ---
 
 ### Rate Limiter
-A token-bucket governor that allows at most `maxCalls` requests per `period`. Tokens refill at the start of each period. Excess callers either wait (up to a configurable deadline) or receive a `RateLimitExceededException` immediately. Ideal for protecting third-party APIs with strict quota contracts.
+A token-bucket governor that allows at most `maxCalls` requests per `period`. Tokens refill at the start of each period. Excess callers either wait (up to a configurable deadline) or receive a `RateLimitExceededException` immediately. `RateLimiterRegistry` lets multiple policies share a single token bucket for the same downstream (e.g. all `"payments"` calls consume from the same pool).
 
 → [Read full documentation](patterns/rate-limiter.md)
 
 ---
 
 ### Bulkhead
-Isolates a resource behind a concurrency limit and a bounded waiting queue. Inspired by ship compartmentalization, it prevents one slow or overloaded resource from consuming all available threads or coroutines. Excess requests are rejected rather than piling up indefinitely.
+Isolates a resource behind a concurrency limit and a bounded waiting queue. Inspired by ship compartmentalization, it prevents one slow or overloaded resource from consuming all available threads or coroutines. Excess requests are rejected rather than piling up indefinitely. `BulkheadRegistry` lets multiple policies share a single concurrency pool.
 
 → [Read full documentation](patterns/bulkhead.md)
 
@@ -64,7 +64,7 @@ Fires multiple redundant attempts in parallel, staggered by a small delay, and r
 ---
 
 ### Cache
-Stores the successful result of a suspend call against a key with a Time-To-Live (TTL). Subsequent calls with the same key return the cached value without hitting the underlying resource. Concurrent requests for a cold key are deduplicated (thundering-herd prevention). Supports invalidation by exact key or prefix.
+Stores the successful result of a suspend call against a key with a Time-To-Live (TTL). Subsequent calls with the same key return the cached value without hitting the underlying resource. Concurrent requests for a cold key are deduplicated (thundering-herd prevention). Supports invalidation by exact key or prefix. `CacheSnapshot` (via `getHealthSnapshot()`) exposes entry count and cumulative hit rate.
 
 → [Read full documentation](patterns/cache.md)
 
@@ -82,7 +82,31 @@ The outermost safety net: when every other policy has been exhausted and the ope
 The default execution order (outer → inner) is:
 
 ```
-Fallback → Cache → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → block
+Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → block
 ```
 
-The order is fully customizable. See [Retry](patterns/retry.md) and the main [README](../README.md) for trade-off examples such as *global timeout* vs *per-attempt timeout*.
+The order is fully customizable via `compositionOrder(listOf(...))`. See [Retry](patterns/retry.md) and the main [README](../README.md) for trade-off examples such as *global timeout* vs *per-attempt timeout*.
+
+---
+
+## CoroutineScope Binding
+
+`CoroutineScope.asResilientScope()` and `CoroutineScope.resilient { }` let you bind a policy's lifecycle directly to an existing coroutine scope (e.g. `viewModelScope`, `lifecycleScope`) — no manual `ResilientScope` creation or `policy.close()` needed. When the outer scope is cancelled, all internal background jobs (cache cleanup, coalescing) are cancelled automatically via structured concurrency.
+
+See the main [README](../README.md#coroutinescope-binding) for usage examples.
+
+---
+
+## Health & Readiness
+
+`policy.getHealthSnapshot()` exposes runtime state for health endpoints and dashboards:
+
+| Field | Type | Available when |
+|---|---|---|
+| `circuitBreaker` | `CircuitBreakerSnapshot?` | `circuitBreaker { }` is configured |
+| `bulkhead` | `BulkheadSnapshot?` | `bulkhead { }` is configured |
+| `rateLimiter` | `RateLimiterSnapshot?` | `rateLimiter { }` is configured |
+| `retry` | `RetrySnapshot?` | `retry { }` is configured |
+| `cache` | `CacheSnapshot?` | `cache { }` is configured |
+
+All fields default to `null` — existing code that reads only `circuitBreaker` or `bulkhead` requires no changes.
