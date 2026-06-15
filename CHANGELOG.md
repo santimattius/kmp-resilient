@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Telemetry Export modules** *(new artifacts: `resilient-otel`, `resilient-micrometer`)*
+  - `resilient-otel`: JVM-only module exporting `SharedFlow<ResilientEvent>` to OpenTelemetry counters via `exportToOpenTelemetry(meter, scope)`.
+  - `resilient-micrometer`: JVM-only module exporting `SharedFlow<ResilientEvent>` to Micrometer counters via `exportToMicrometer(registry, scope)`.
+  - Both APIs are `@ResilientExperimentalApi`. The returned `Job` gives callers full control over the export lifecycle: cancelling the job stops event collection.
+  - Metrics covered: `resilient.retry.attempts`, `resilient.circuit_breaker.state_changes`, `resilient.rate_limiter.limited`, `resilient.bulkhead.rejected`, `resilient.operation.success`, `resilient.operation.failure`, `resilient.cache.hits`, `resilient.cache.misses`, `resilient.timeout.triggered`, `resilient.hedging.used`, `resilient.fallback.triggered`.
 - **Deadline Propagation** (`@ResilientExperimentalApi`)
   - New `ResilientDeadline` coroutine context element for propagating a deadline across the resilient policy pipeline.
   - `ResilientDeadline.after(duration)` factory creates a deadline that expires after the given duration from now.
