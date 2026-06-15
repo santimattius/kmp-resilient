@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
@@ -376,6 +377,7 @@ class ResilientBuilder {
  * @param block A lambda with a [ResilientBuilder] receiver to configure the desired resilience policies.
  * @return A [ResilientPolicy] instance that can be used to execute operations with the configured policies.
  */
+@OptIn(ResilientExperimentalApi::class)
 fun resilient(
     resilientScope: ResilientScope,
     block: ResilientBuilder.() -> Unit
@@ -521,7 +523,7 @@ fun resilient(
                     } else {
                         remainingMs
                     }
-                    withTimeout(effectiveTimeoutMs) { composed() }
+                    withTimeout(effectiveTimeoutMs.milliseconds) { composed() }
                 } else {
                     composed()
                 }
