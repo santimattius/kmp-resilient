@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - `resilient-micrometer`: JVM-only module exporting `SharedFlow<ResilientEvent>` to Micrometer counters via `exportToMicrometer(registry, scope)`.
   - Both APIs are `@ResilientExperimentalApi`. The returned `Job` gives callers full control over the export lifecycle: cancelling the job stops event collection.
   - Metrics covered: `resilient.retry.attempts`, `resilient.circuit_breaker.state_changes`, `resilient.rate_limiter.limited`, `resilient.bulkhead.rejected`, `resilient.operation.success`, `resilient.operation.failure`, `resilient.cache.hits`, `resilient.cache.misses`, `resilient.timeout.triggered`, `resilient.hedging.used`, `resilient.fallback.triggered`.
+- **Deadline Propagation** (`@ResilientExperimentalApi`)
+  - New `ResilientDeadline` coroutine context element for propagating a deadline across the resilient policy pipeline.
+  - `ResilientDeadline.after(duration)` factory creates a deadline that expires after the given duration from now.
+  - When `ResilientDeadline` is present in the coroutine context, `ResilientPolicy.execute` enforces it automatically:
+    - If the deadline has already expired, `TimeoutCancellationException` is thrown immediately without invoking the block.
+    - If both a deadline and an explicit `timeout { }` are configured, the shorter of the two wins (`min(timeout, remaining)`).
+  - Fully KMP — implemented in `commonMain` using `kotlin.time.TimeMark` and `withTimeout`.
 
 ---
 
