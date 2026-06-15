@@ -5,6 +5,39 @@ import com.santimattius.resilient.circuitbreaker.CircuitBreakerSnapshot
 import com.santimattius.resilient.bulkhead.BulkheadSnapshot
 import com.santimattius.resilient.telemetry.ResilientEvent
 import kotlinx.coroutines.flow.SharedFlow
+import kotlin.time.Duration
+
+/**
+ * Point-in-time snapshot of the rate limiter policy state.
+ *
+ * @property remainingCalls Number of tokens (calls) still available in the current window.
+ * @property timeToRefill Duration until the bucket is refilled.
+ */
+data class RateLimiterSnapshot(
+    val remainingCalls: Int,
+    val timeToRefill: Duration
+)
+
+/**
+ * Point-in-time snapshot of the retry policy configuration.
+ *
+ * @property maxAttempts Maximum number of attempts (including the first one).
+ */
+data class RetrySnapshot(
+    val maxAttempts: Int
+)
+
+/**
+ * Point-in-time snapshot of the cache policy state.
+ *
+ * @property entryCount Current number of entries in the cache.
+ * @property hitRate Ratio of cache hits to total lookups (hits + misses).
+ *           [Double.NaN] when no calls have been made yet.
+ */
+data class CacheSnapshot(
+    val entryCount: Int,
+    val hitRate: Double
+)
 
 /**
  * Point-in-time snapshot of policy state for health/readiness endpoints and metrics.
@@ -13,12 +46,21 @@ import kotlinx.coroutines.flow.SharedFlow
  * (e.g. Kubernetes readiness/liveness, or a `/health` API) so load balancers and orchestrators
  * can decide whether to route traffic.
  *
+ * This is a **source-compatible** addition. Trailing nullable fields with defaults ensure
+ * existing consumers compile without modification.
+ *
  * @property circuitBreaker Snapshot of circuit breaker state and counters; null if no circuit breaker was configured.
  * @property bulkhead Snapshot of bulkhead usage; null if no bulkhead was configured or the implementation does not support snapshot.
+ * @property rateLimiter Snapshot of rate limiter token state; null if no rate limiter was configured.
+ * @property retry Snapshot of retry configuration; null if no retry was configured.
+ * @property cache Snapshot of cache usage and hit rate; null if no cache was configured.
  */
 data class PolicyHealthSnapshot(
     val circuitBreaker: CircuitBreakerSnapshot? = null,
-    val bulkhead: BulkheadSnapshot? = null
+    val bulkhead: BulkheadSnapshot? = null,
+    val rateLimiter: RateLimiterSnapshot? = null,
+    val retry: RetrySnapshot? = null,
+    val cache: CacheSnapshot? = null
 )
 
 /**

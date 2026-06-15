@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.safeContentPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -23,8 +25,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.santimattius.resilient.circuitbreaker.CircuitState
 
@@ -36,13 +38,15 @@ fun ResilientExample(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val resourceId by viewModel.resourceId.collectAsState()
+    val scrollState = rememberScrollState()
 
     MaterialTheme {
         Column(
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.primaryContainer)
                 .safeContentPadding()
-                .fillMaxSize(),
+                .fillMaxSize()
+                .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(
@@ -52,6 +56,41 @@ fun ResilientExample(
                 Image(painterResource(R.drawable.compose_multiplatform), null)
             }
 
+            Text("kmp-resilient 1.5.0 demo", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "DecorrelatedJitter · CircuitBreakerRegistry · RateLimiterRegistry · " +
+                    "shouldRecordResult · failureRateThreshold · richer health snapshots",
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Demo mode", style = MaterialTheme.typography.titleSmall)
+            DemoMode.entries.forEach { mode ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = uiState.demoMode == mode,
+                            onClick = { viewModel.setDemoMode(mode) },
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(
+                        selected = uiState.demoMode == mode,
+                        onClick = { viewModel.setDemoMode(mode) },
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = MaterialTheme.colorScheme.primary,
+                            unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    )
+                    Column {
+                        Text(mode.label, style = MaterialTheme.typography.bodyMedium)
+                        Text(mode.hint, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
             Text("Cache key: demo:$resourceId (keyProvider)")
 
             Row(
@@ -65,7 +104,7 @@ fun ResilientExample(
                             .weight(1f)
                             .selectable(
                                 selected = resourceId == id,
-                                onClick = { viewModel.setResourceId(id) }
+                                onClick = { viewModel.setResourceId(id) },
                             ),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -75,14 +114,12 @@ fun ResilientExample(
                             colors = RadioButtonDefaults.colors(
                                 selectedColor = MaterialTheme.colorScheme.primary,
                                 unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            ),
                         )
                         Text(id)
                     }
                 }
             }
-
-
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -104,6 +141,12 @@ fun ResilientExample(
 
             Spacer(modifier = Modifier.height(8.dp))
             Text("Health / Readiness (getHealthSnapshot)", style = MaterialTheme.typography.titleSmall)
+            uiState.sharedCircuitState?.let { state ->
+                Text(
+                    "Shared registry CB: $state (DefaultCircuitBreaker.state)",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Button(
                 onClick = { viewModel.refreshHealthSnapshot() },
                 enabled = !uiState.isLoading,
@@ -113,12 +156,16 @@ fun ResilientExample(
 
             Button(
                 onClick = { viewModel.executePolicy() },
-                enabled = !uiState.isLoading
+                enabled = !uiState.isLoading,
             ) {
                 Text("Run resilient call")
             }
+
             uiState.healthSnapshot?.let { snap ->
-                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     snap.circuitBreaker?.let { cb ->
                         Text("Circuit: ${cb.state} (failures=${cb.failureCount}, successes=${cb.successCount})")
                         if (cb.state == CircuitState.OPEN) {
@@ -126,7 +173,24 @@ fun ResilientExample(
                         }
                     }
                     snap.bulkhead?.let { bh ->
-                        Text("Bulkhead: ${bh.activeConcurrentCalls}/${bh.maxConcurrentCalls} active, ${bh.waitingCalls}/${bh.maxWaitingCalls} waiting")
+                        Text(
+                            "Bulkhead: ${bh.activeConcurrentCalls}/${bh.maxConcurrentCalls} active, " +
+                                "${bh.waitingCalls}/${bh.maxWaitingCalls} waiting",
+                        )
+                    }
+                    snap.rateLimiter?.let { rl ->
+                        Text("Rate limiter: ${rl.remainingCalls} tokens left, refill in ${rl.timeToRefill}")
+                    }
+                    snap.retry?.let { retry ->
+                        Text("Retry: maxAttempts=${retry.maxAttempts}")
+                    }
+                    snap.cache?.let { cache ->
+                        val hitRate = if (cache.hitRate.isNaN()) {
+                            "n/a"
+                        } else {
+                            "${(cache.hitRate * 100).toInt()}%"
+                        }
+                        Text("Cache: ${cache.entryCount} entries, hitRate=$hitRate")
                     }
                 }
             }
@@ -140,13 +204,13 @@ fun ResilientExample(
             }
 
             uiState.error?.let {
-                Text("Error: $it")
+                Text("Error: $it", color = MaterialTheme.colorScheme.error)
             }
 
             if (uiState.events.isNotEmpty()) {
                 Text("Events:")
                 uiState.events.forEach {
-                    Text(it)
+                    Text(it, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

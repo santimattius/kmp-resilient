@@ -13,6 +13,8 @@ import com.santimattius.resilient.cache.CacheConfig
 import com.santimattius.resilient.cache.CacheHandle
 import com.santimattius.resilient.cache.InMemoryCachePolicy
 import com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig
+import com.santimattius.resilient.circuitbreaker.CircuitBreakerRegistry
+import com.santimattius.resilient.circuitbreaker.CircuitState
 import com.santimattius.resilient.circuitbreaker.DefaultCircuitBreaker
 import com.santimattius.resilient.fallback.FallbackConfig
 import com.santimattius.resilient.fallback.FallbackPolicy
@@ -20,6 +22,7 @@ import com.santimattius.resilient.hedging.DefaultHedgingPolicy
 import com.santimattius.resilient.hedging.HedgingConfig
 import com.santimattius.resilient.ratelimiter.DefaultRateLimiter
 import com.santimattius.resilient.ratelimiter.RateLimiterConfig
+import com.santimattius.resilient.ratelimiter.RateLimiterRegistry
 import com.santimattius.resilient.retry.DefaultRetryPolicy
 import com.santimattius.resilient.retry.RetryPolicyConfig
 import com.santimattius.resilient.PolicyHealthSnapshot
@@ -44,6 +47,25 @@ internal data class BulkheadNamedSpec(
     val registry: BulkheadRegistry,
     val name: String,
     val configure: BulkheadConfig.() -> Unit
+)
+
+/**
+ * Named circuit-breaker request: resolved at [resilient] build time via
+ * [CircuitBreakerRegistry.getOrCreate].
+ */
+internal data class CircuitBreakerNamedSpec(
+    val registry: CircuitBreakerRegistry,
+    val name: String,
+    val configure: CircuitBreakerConfig.() -> Unit
+)
+
+/**
+ * Named rate-limiter request: resolved at [resilient] build time via [RateLimiterRegistry.getOrCreate].
+ */
+internal data class RateLimiterNamedSpec(
+    val registry: RateLimiterRegistry,
+    val name: String,
+    val configure: RateLimiterConfig.() -> Unit
 )
 
 /**
@@ -84,7 +106,9 @@ internal data class BulkheadNamedSpec(
 class ResilientBuilder {
     internal var retryConfig: RetryPolicyConfig? = null
     internal var circuitBreakerConfig: CircuitBreakerConfig? = null
+    internal var circuitBreakerNamedSpec: CircuitBreakerNamedSpec? = null
     internal var rateLimiterConfig: RateLimiterConfig? = null
+    internal var rateLimiterNamedSpec: RateLimiterNamedSpec? = null
     internal var bulkheadConfig: BulkheadConfig? = null
     internal var bulkheadNamedSpec: BulkheadNamedSpec? = null
     internal var timeoutConfig: TimeoutConfig? = null
@@ -108,9 +132,42 @@ class ResilientBuilder {
     /**
      * Configures a circuit breaker. Execution is rejected when the circuit is open.
      * @param config Lambda to configure [CircuitBreakerConfig] (e.g. failureThreshold, timeout).
+     *
+     * Cannot be combined with [circuitBreakerNamed] in the same builder.
      */
     fun circuitBreaker(config: CircuitBreakerConfig.() -> Unit) {
+        require(circuitBreakerNamedSpec == null) {
+            "Cannot use circuitBreaker { } together with circuitBreakerNamed(...); choose one."
+        }
         circuitBreakerConfig = (circuitBreakerConfig ?: CircuitBreakerConfig()).apply(config)
+    }
+
+    /**
+     * Uses a shared [DefaultCircuitBreaker] from [registry] keyed by [name].
+     * Multiple policies can pass the same [CircuitBreakerRegistry] and name to share a **global**
+     * circuit breaker state across those policies.
+     *
+     * **Telemetry limitation:** only the first policy that registers a [name] in the registry will
+     * receive [com.santimattius.resilient.telemetry.ResilientEvent.CircuitStateChanged] events via
+     * its `events` [kotlinx.coroutines.flow.SharedFlow]. Subsequent policies reusing the same
+     * registry entry share the breaker state but do not receive telemetry events for it.
+     * Observe the shared breaker directly via [DefaultCircuitBreaker.state] for shared
+     * observability.
+     *
+     * Cannot be combined with [circuitBreaker] in the same builder.
+     */
+    fun circuitBreakerNamed(
+        registry: CircuitBreakerRegistry,
+        name: String,
+        config: CircuitBreakerConfig.() -> Unit
+    ) {
+        require(circuitBreakerConfig == null) {
+            "Cannot use circuitBreakerNamed(...) together with circuitBreaker { }; choose one."
+        }
+        require(circuitBreakerNamedSpec == null) {
+            "circuitBreakerNamed(...) can only be configured once per policy."
+        }
+        circuitBreakerNamedSpec = CircuitBreakerNamedSpec(registry, name, config)
     }
 
     /**
@@ -118,7 +175,31 @@ class ResilientBuilder {
      * @param config Lambda to configure [RateLimiterConfig] (e.g. maxCalls, period).
      */
     fun rateLimiter(config: RateLimiterConfig.() -> Unit) {
+        require(rateLimiterNamedSpec == null) {
+            "Cannot use rateLimiter { } together with rateLimiterNamed(...); choose one."
+        }
         rateLimiterConfig = (rateLimiterConfig ?: RateLimiterConfig()).apply(config)
+    }
+
+    /**
+     * Uses a shared [DefaultRateLimiter] from [registry] keyed by [name].
+     * Multiple policies can pass the same [RateLimiterRegistry] and name to enforce a **global** quota
+     * across those policies.
+     *
+     * Cannot be combined with [rateLimiter] in the same builder.
+     */
+    fun rateLimiterNamed(
+        registry: RateLimiterRegistry,
+        name: String,
+        configure: RateLimiterConfig.() -> Unit
+    ) {
+        require(rateLimiterConfig == null) {
+            "Cannot use rateLimiterNamed(...) together with rateLimiter { }; choose one."
+        }
+        require(rateLimiterNamedSpec == null) {
+            "rateLimiterNamed(...) can only be configured once per policy."
+        }
+        rateLimiterNamedSpec = RateLimiterNamedSpec(registry, name, configure)
     }
 
     /**
@@ -335,7 +416,14 @@ fun resilient(
         DefaultRetryPolicy(copy)
     }
 
-    val circuitBreaker = builder.circuitBreakerConfig?.let { cfg ->
+    // Named circuit breaker takes precedence over the inline config block.
+    // When the named spec resolves to an existing registry entry, the onStateChanged callback
+    // is set only at creation time — see CircuitBreakerRegistry.getOrCreate telemetry note.
+    val circuitBreaker: DefaultCircuitBreaker? = builder.circuitBreakerNamedSpec?.let { spec ->
+        spec.registry.getOrCreate(spec.name, spec.configure) { new, old ->
+            events.tryEmit(ResilientEvent.CircuitStateChanged(old, new))
+        }
+    } ?: builder.circuitBreakerConfig?.let { cfg ->
         // Clone config so the original is not mutated (avoids duplicate callbacks if config is reused)
         val copy = CircuitBreakerConfig().apply {
             failureThreshold = cfg.failureThreshold
@@ -354,7 +442,11 @@ fun resilient(
         }
     }
 
-    val rateLimiter = builder.rateLimiterConfig?.let { cfg ->
+    val rateLimiter = builder.rateLimiterNamedSpec?.let { spec ->
+        spec.registry.getOrCreate(spec.name, spec.configure) { wait ->
+            events.emit(ResilientEvent.RateLimited(wait))
+        }
+    } ?: builder.rateLimiterConfig?.let { cfg ->
         DefaultRateLimiter(
             config = cfg,
             onRateLimited = { wait ->
@@ -401,7 +493,10 @@ fun resilient(
 
         override fun getHealthSnapshot(): PolicyHealthSnapshot = PolicyHealthSnapshot(
             circuitBreaker = circuitBreaker?.snapshot(),
-            bulkhead = bulkhead?.snapshot()
+            bulkhead = bulkhead?.snapshot(),
+            rateLimiter = rateLimiter?.snapshot(),
+            retry = retry?.snapshot(),
+            cache = cache?.snapshot()
         )
 
         @OptIn(ResilientExperimentalApi::class)

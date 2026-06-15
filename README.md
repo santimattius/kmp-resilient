@@ -119,22 +119,68 @@ val policy = resilient {
     }
 }
 ```
-Supported backoffs: `ExponentialBackoff`, `LinearBackoff`, `FixedBackoff`.
+Supported backoffs: `ExponentialBackoff`, `LinearBackoff`, `FixedBackoff`, `DecorrelatedJitterBackoff`.
+
+**`DecorrelatedJitterBackoff`** implements the AWS decorrelated jitter formula — each caller's delay sequence is independent of every other caller's, which breaks synchronized retry waves in high-concurrency scenarios:
+```kotlin
+import com.santimattius.resilient.retry.DecorrelatedJitterBackoff
+
+val policy = resilient {
+    retry {
+        maxAttempts     = 4
+        backoffStrategy = DecorrelatedJitterBackoff(base = 100.milliseconds, cap = 10.seconds)
+    }
+}
+```
 → [In-depth documentation](docs/patterns/retry.md)
 
 ### Circuit Breaker
 Prevents hammering failing downstreams. States: CLOSED → OPEN → HALF_OPEN.
 
-By default, **`failureThreshold`** counts **consecutive** failures in CLOSED (a success resets the count). Set **`slidingWindow`** to a positive duration to open when **`failureThreshold`** failures fall **within that time window** (not necessarily consecutive); successes only prune expired timestamps from the window.
+Three trip modes are available:
+
+- **Consecutive** (default): `failureThreshold` consecutive failures open the circuit; a success resets the count.
+- **Sliding window** (`slidingWindow`): `failureThreshold` failures within a time window open the circuit.
+- **Failure-rate** (`failureRateThreshold`): circuit opens when the failure rate over the last `minimumNumberOfCalls` outcomes meets or exceeds a percentage.
+
 ```kotlin
 val policy = resilient(scope) {
     circuitBreaker {
         failureThreshold = 5
         successThreshold = 2
         halfOpenMaxCalls = 1
-        timeout = 60.seconds // OPEN duration
-        slidingWindow = 30.seconds // optional: time-based failure window
+        timeout          = 60.seconds
+        // slidingWindow = 30.seconds       // time-based mode (mutually exclusive with failureRateThreshold)
+        // failureRateThreshold = 50.0      // failure-rate mode — opens at 50% over last minimumNumberOfCalls
+        // minimumNumberOfCalls = 10        // ring-buffer size (default 10)
     }
+}
+```
+
+**`shouldRecordResult`** counts a successful return value as a failure (while still returning it to the caller) — useful when the downstream signals errors inside HTTP 200 responses:
+```kotlin
+val policy = resilient(scope) {
+    circuitBreaker {
+        failureThreshold   = 3
+        shouldRecordResult = { result -> result is ApiResponse && result.code == 503 }
+    }
+}
+```
+
+**Named / shared circuit breaker:** use `CircuitBreakerRegistry` so multiple policies share the same breaker state (e.g. all `"payments"` calls trip a single breaker). Cannot combine `circuitBreaker { }` and `circuitBreakerNamed(...)` in the same policy.
+```kotlin
+import com.santimattius.resilient.circuitbreaker.CircuitBreakerRegistry
+
+val circuitBreakers = CircuitBreakerRegistry()
+
+val policyA = resilient(scope) {
+    circuitBreakerNamed(circuitBreakers, "payments") {
+        failureThreshold = 5
+        timeout          = 30.seconds
+    }
+}
+val policyB = resilient(scope) {
+    circuitBreakerNamed(circuitBreakers, "payments") { } // same instance as policyA
 }
 ```
 → [In-depth documentation](docs/patterns/circuit-breaker.md)
@@ -149,6 +195,19 @@ val policy = resilient {
         timeoutWhenLimited = 5.seconds // throw if wait would exceed
         onRateLimited = { /* metric */ }
     }
+}
+```
+**Named / shared rate limiter:** use `RateLimiterRegistry` so multiple policies share the same token-bucket quota (e.g. all `"payments"` calls consume from the same pool). Cannot combine `rateLimiter { }` and `rateLimiterNamed(...)` in the same policy.
+```kotlin
+import com.santimattius.resilient.ratelimiter.RateLimiterRegistry
+
+val rateLimiters = RateLimiterRegistry()
+
+val policyA = resilient(scope) {
+    rateLimiterNamed(rateLimiters, "payments") { maxCalls = 10; period = 1.seconds }
+}
+val policyB = resilient(scope) {
+    rateLimiterNamed(rateLimiters, "payments") { } // same instance as policyA
 }
 ```
 → [In-depth documentation](docs/patterns/rate-limiter.md)
@@ -226,20 +285,74 @@ val policy = resilient(scope) {
 }
 ```
 
+### CoroutineScope Binding
+
+By default you pass a `ResilientScope` explicitly. When working inside a framework that already manages a `CoroutineScope` (e.g. `viewModelScope`, `lifecycleScope`, `rememberCoroutineScope`), you can bind the policy lifecycle directly to that scope — no manual `ResilientScope` creation or `policy.close()` needed.
+
+**`CoroutineScope.asResilientScope()`** — wraps an existing scope as a `ResilientScope`. Cancelling the outer scope automatically cancels all internal background jobs (cache cleanup, coalescing deduplication):
+
+```kotlin
+import com.santimattius.resilient.composition.asResilientScope
+
+// Android ViewModel
+class ProfileViewModel : ViewModel() {
+    private val scope  = viewModelScope.asResilientScope()
+    private val policy = resilient(scope) {
+        cache { key = "profile"; ttl = 60.seconds }
+        retry { maxAttempts = 3 }
+    }
+    // When the ViewModel is cleared, viewModelScope is cancelled → scope and all policy
+    // background jobs are cancelled automatically. No policy.close() needed.
+}
+```
+
+**`CoroutineScope.resilient { }`** — shorthand that combines `.asResilientScope()` and `resilient(scope) { }` in one call:
+
+```kotlin
+import com.santimattius.resilient.composition.resilient
+
+class ProfileViewModel : ViewModel() {
+    private val policy = viewModelScope.resilient {
+        cache { key = "profile"; ttl = 60.seconds }
+        retry { maxAttempts = 3 }
+    }
+}
+```
+
+**Lifecycle contract:**
+- When the outer `CoroutineScope` is cancelled → the derived scope and all its background jobs are cancelled automatically via structured concurrency.
+- Calling `policy.close()` stops only the internal policy jobs — it does **not** cancel the outer scope.
+- Do not call these on an already-cancelled scope; internal coroutine launches will fail with `CancellationException`.
+
 ### Health / Readiness
-Use `policy.getHealthSnapshot()` to build health or readiness endpoints (e.g. Kubernetes probes, `/health` API). The snapshot includes circuit breaker state and counters, and bulkhead usage when configured.
+Use `policy.getHealthSnapshot()` to build health or readiness endpoints (e.g. Kubernetes probes, `/health` API). The snapshot includes circuit breaker state, bulkhead usage, rate limiter quota, retry config, and cache stats when the corresponding policies are configured.
 ```kotlin
 import com.santimattius.resilient.circuitbreaker.CircuitState
 
 val snapshot = policy.getHealthSnapshot()
 
-// Circuit breaker: is the circuit open?
+// Circuit breaker state
 val healthy = snapshot.circuitBreaker?.state != CircuitState.OPEN
-// Optional: snapshot.circuitBreaker?.failureCount, successCount for metrics
+// snapshot.circuitBreaker?.failureCount, successCount
 
 // Bulkhead: active and waiting counts
 snapshot.bulkhead?.let { bh ->
     // bh.activeConcurrentCalls, bh.waitingCalls, bh.maxConcurrentCalls, bh.maxWaitingCalls
+}
+
+// Rate limiter: remaining tokens and time until next refill
+snapshot.rateLimiter?.let { rl ->
+    // rl.remainingCalls, rl.timeToRefill
+}
+
+// Retry: configured max attempts
+snapshot.retry?.let { r ->
+    // r.maxAttempts
+}
+
+// Cache: entry count and cumulative hit rate (Double.NaN when no calls yet)
+snapshot.cache?.let { c ->
+    // c.entryCount, c.hitRate
 }
 ```
 
@@ -301,26 +414,29 @@ The `resilient-test` module provides utilities for testing resilience policies w
 
 ### Fault Injection
 
-Use `FaultInjector` to simulate failures, delays, and intermittent behavior in your tests:
+Use `FaultInjector` to simulate failures, delays, and intermittent behavior in your tests. Prefer **`failCount`** for unit tests — it produces deterministic results and avoids intermittent failures.
 
 ```kotlin
 import com.santimattius.resilient.test.FaultInjector
 import kotlin.time.Duration.Companion.milliseconds
 
+// Deterministic (preferred for unit tests): fail the first N calls, then succeed
 val injector = FaultInjector.builder()
-    .failureRate(0.3)           // 30% chance of failure
-    .delay(50.milliseconds)      // Add 50ms delay
-    .delayJitter(true)           // Randomize delay ±20%
-    .exception { CustomException() }  // Custom exception
+    .failCount(3)   // fails calls 1–3, succeeds on call 4
     .build()
 
-val result = injector.execute {
-    fetchData() // may throw or delay
-}
+// Probabilistic: use only for chaos / load tests, not unit tests
+val chaosInjector = FaultInjector.builder()
+    .failureRate(0.3)           // 30% chance of failure per call
+    .delay(50.milliseconds)     // Add 50ms delay
+    .delayJitter(true)          // Randomize delay ±20%
+    .exception { CustomException() }
+    .build()
 ```
 
 **Configuration:**
-- `failureRate(rate: Double)`: Probability of throwing an exception (0.0 = never, 1.0 = always).
+- `failCount(n: Int)`: Fail the first `n` calls deterministically, then always succeed. Takes precedence over `failureRate`. **Preferred for unit tests.**
+- `failureRate(rate: Double)`: Probability of throwing an exception per call (0.0 = never, 1.0 = always). Ignored when `failCount > 0`.
 - `exception(block: () -> Throwable)`: Factory for the exception to throw (default: `FaultInjectedException`).
 - `delay(duration: Duration)`: Fixed delay before executing the block (default: `Duration.ZERO`).
 - `delayJitter(enable: Boolean)`: Randomize delay ±20% (default: `false`).
@@ -336,21 +452,21 @@ import kotlinx.coroutines.test.runTest
 
 @Test
 fun `test retry with fault injection`() = runTest {
-    val scope = TestResilientScope(this)
+    val scope = TestResilientScope()
     val policy = PolicyBuilders.retryPolicy(
         scope,
         maxAttempts = 3,
         initialDelay = 10.milliseconds
     )
-    
+
     val injector = FaultInjector.builder()
-        .failureRate(0.5)
+        .failCount(2)  // fail first 2 calls, succeed on the 3rd
         .build()
-    
+
     val result = policy.execute {
         injector.execute { "success" }
     }
-    
+
     assertEquals("success", result)
 }
 ```
@@ -392,7 +508,7 @@ Add the `resilient-test` module to your test dependencies:
 kotlin {
     sourceSets {
         commonTest.dependencies {
-            implementation("io.github.santimattius.resilient:resilient-test:1.3.0")
+            implementation("io.github.santimattius.resilient:resilient-test:1.5.0")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
         }
     }
@@ -422,4 +538,16 @@ Theoretical and technical deep-dive documentation for each pattern — definitio
 | Fallback | [docs/patterns/fallback.md](docs/patterns/fallback.md) |
 
 → [Full index with descriptions](docs/README.md)
+
+---
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding guidelines, and the pull request process.
+
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+
+This project is licensed under the [Apache License 2.0](LICENSE).
 
