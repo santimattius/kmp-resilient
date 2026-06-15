@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+### Added
+
+- **Deadline Propagation** (`@ResilientExperimentalApi`)
+  - New `ResilientDeadline` coroutine context element for propagating a deadline across the resilient policy pipeline.
+  - `ResilientDeadline.after(duration)` factory creates a deadline that expires after the given duration from now.
+  - When `ResilientDeadline` is present in the coroutine context, `ResilientPolicy.execute` enforces it automatically:
+    - If the deadline has already expired, `TimeoutCancellationException` is thrown immediately without invoking the block.
+    - If both a deadline and an explicit `timeout { }` are configured, the shorter of the two wins (`min(timeout, remaining)`).
+  - Fully KMP — implemented in `commonMain` using `kotlin.time.TimeMark` and `withTimeout`.
+
 ---
 
 ## [1.5.0] - 2026-06-06
