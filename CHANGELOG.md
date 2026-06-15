@@ -21,6 +21,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - If the deadline has already expired, `TimeoutCancellationException` is thrown immediately without invoking the block.
     - If both a deadline and an explicit `timeout { }` are configured, the shorter of the two wins (`min(timeout, remaining)`).
   - Fully KMP — implemented in `commonMain` using `kotlin.time.TimeMark` and `withTimeout`.
+- **Chaos Policy** *(experimental — `@ResilientExperimentalApi`)*
+  - `ChaosConfig`: DSL config for fault injection with `enabled` (defaults to `false` — production safeguard), `failureRate` (0.0–1.0), `latency` (`Duration?`), `exception` factory, and `injectResult` override.
+  - `DefaultChaosPolicy`: innermost wrapper that injects latency, random faults, or overridden return values. Zero overhead when `enabled = false` — no wrapper is installed.
+  - `ResilientBuilder.chaos { }` DSL function to configure chaos within a `resilient { }` block.
+  - `OrderablePolicyType.CHAOS` appended after `BULKHEAD` in the default composition order.
+  - Chaos is positioned as the innermost policy (wraps the user block directly) so it controls exactly what the block sees.
 
 ---
 
