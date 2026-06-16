@@ -9,6 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Ktor HTTP Client Plugin** *(new artifact: `resilient-ktor`)*
+  - `ResilientPlugin`: Ktor 3.x `HttpClient` plugin that applies a `ResilientPolicy` to every outgoing HTTP request via the `on(Send)` hook — no code changes to the policy engine.
+  - **BYO policy mode**: `install(ResilientPlugin) { policy = yourPolicy }` — bring a pre-built policy; the plugin does not close it on `HttpClient.close()`.
+  - **Inline DSL mode**: `install(ResilientPlugin) { scope = ...; retry { }; circuitBreaker { } }` — plugin builds and owns the policy, closing it automatically on `HttpClient.close()`.
+  - `shouldRetryOnStatus: (HttpStatusCode) -> Boolean` (default: `{ it.value >= 500 }`) — status-based retry without requiring `expectSuccess = true`; bridged into `RetryPolicyConfig.shouldRetryResult`.
+  - `retryOnlyIdempotent = true` (default): POST and PATCH requests bypass the entire policy (retry, circuit breaker, timeout) to preserve at-most-once semantics.
+  - Full KMP support: Android, JVM, JS (browser+node), iOS (x64/arm64/simulatorArm64), macOS (arm64).
+  - Requires Ktor 3.x (`io.ktor:ktor-client-core:3.2.0+`).
 - **Telemetry Export modules** *(new artifacts: `resilient-otel`, `resilient-micrometer`)*
   - `resilient-otel`: JVM-only module exporting `SharedFlow<ResilientEvent>` to OpenTelemetry counters via `exportToOpenTelemetry(meter, scope)`.
   - `resilient-micrometer`: JVM-only module exporting `SharedFlow<ResilientEvent>` to Micrometer counters via `exportToMicrometer(registry, scope)`.
