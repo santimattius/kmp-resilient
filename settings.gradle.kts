@@ -31,3 +31,6 @@ dependencyResolutionManagement {
 include(":androidApp")
 include(":shared")
 include(":resilient-test")
+include(":resilient-otel")
+include(":resilient-micrometer")
+include(":resilient-ktor")

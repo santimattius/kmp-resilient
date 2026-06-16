@@ -37,6 +37,9 @@ android {
 
 dependencies {
     implementation(projects.shared)
+    implementation(projects.resilientKtor)
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.mock)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
 

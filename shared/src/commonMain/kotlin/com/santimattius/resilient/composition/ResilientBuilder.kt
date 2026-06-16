@@ -2,6 +2,8 @@ package com.santimattius.resilient.composition
 
 import com.santimattius.resilient.ResilientPolicy
 import com.santimattius.resilient.annotations.ResilientExperimentalApi
+import com.santimattius.resilient.chaos.ChaosConfig
+import com.santimattius.resilient.chaos.DefaultChaosPolicy
 import com.santimattius.resilient.coalescing.CoalesceConfig
 import com.santimattius.resilient.coalescing.DefaultCoalescingPolicy
 import com.santimattius.resilient.bulkhead.BulkheadConfig
@@ -11,13 +13,17 @@ import com.santimattius.resilient.cache.CacheConfig
 import com.santimattius.resilient.cache.CacheHandle
 import com.santimattius.resilient.cache.InMemoryCachePolicy
 import com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig
+import com.santimattius.resilient.circuitbreaker.CircuitBreakerRegistry
+import com.santimattius.resilient.circuitbreaker.CircuitState
 import com.santimattius.resilient.circuitbreaker.DefaultCircuitBreaker
+import com.santimattius.resilient.deadline.ResilientDeadline
 import com.santimattius.resilient.fallback.FallbackConfig
 import com.santimattius.resilient.fallback.FallbackPolicy
 import com.santimattius.resilient.hedging.DefaultHedgingPolicy
 import com.santimattius.resilient.hedging.HedgingConfig
 import com.santimattius.resilient.ratelimiter.DefaultRateLimiter
 import com.santimattius.resilient.ratelimiter.RateLimiterConfig
+import com.santimattius.resilient.ratelimiter.RateLimiterRegistry
 import com.santimattius.resilient.retry.DefaultRetryPolicy
 import com.santimattius.resilient.retry.RetryPolicyConfig
 import com.santimattius.resilient.PolicyHealthSnapshot
@@ -27,6 +33,9 @@ import com.santimattius.resilient.timeout.TimeoutConfig
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
@@ -42,6 +51,25 @@ internal data class BulkheadNamedSpec(
     val registry: BulkheadRegistry,
     val name: String,
     val configure: BulkheadConfig.() -> Unit
+)
+
+/**
+ * Named circuit-breaker request: resolved at [resilient] build time via
+ * [CircuitBreakerRegistry.getOrCreate].
+ */
+internal data class CircuitBreakerNamedSpec(
+    val registry: CircuitBreakerRegistry,
+    val name: String,
+    val configure: CircuitBreakerConfig.() -> Unit
+)
+
+/**
+ * Named rate-limiter request: resolved at [resilient] build time via [RateLimiterRegistry.getOrCreate].
+ */
+internal data class RateLimiterNamedSpec(
+    val registry: RateLimiterRegistry,
+    val name: String,
+    val configure: RateLimiterConfig.() -> Unit
 )
 
 /**
@@ -82,7 +110,9 @@ internal data class BulkheadNamedSpec(
 class ResilientBuilder {
     internal var retryConfig: RetryPolicyConfig? = null
     internal var circuitBreakerConfig: CircuitBreakerConfig? = null
+    internal var circuitBreakerNamedSpec: CircuitBreakerNamedSpec? = null
     internal var rateLimiterConfig: RateLimiterConfig? = null
+    internal var rateLimiterNamedSpec: RateLimiterNamedSpec? = null
     internal var bulkheadConfig: BulkheadConfig? = null
     internal var bulkheadNamedSpec: BulkheadNamedSpec? = null
     internal var timeoutConfig: TimeoutConfig? = null
@@ -90,6 +120,8 @@ class ResilientBuilder {
     internal var coalesceConfig: CoalesceConfig? = null
     internal var fallbackConfig: FallbackConfig<Any?>? = null
     internal var hedgingConfig: HedgingConfig? = null
+    @ResilientExperimentalApi
+    internal var chaosConfig: ChaosConfig? = null
     internal var compositionOrder: CompositionOrder = CompositionOrder.DEFAULT
     internal var compositionOrderExplicitlySet: Boolean = false
 
@@ -104,9 +136,42 @@ class ResilientBuilder {
     /**
      * Configures a circuit breaker. Execution is rejected when the circuit is open.
      * @param config Lambda to configure [CircuitBreakerConfig] (e.g. failureThreshold, timeout).
+     *
+     * Cannot be combined with [circuitBreakerNamed] in the same builder.
      */
     fun circuitBreaker(config: CircuitBreakerConfig.() -> Unit) {
+        require(circuitBreakerNamedSpec == null) {
+            "Cannot use circuitBreaker { } together with circuitBreakerNamed(...); choose one."
+        }
         circuitBreakerConfig = (circuitBreakerConfig ?: CircuitBreakerConfig()).apply(config)
+    }
+
+    /**
+     * Uses a shared [DefaultCircuitBreaker] from [registry] keyed by [name].
+     * Multiple policies can pass the same [CircuitBreakerRegistry] and name to share a **global**
+     * circuit breaker state across those policies.
+     *
+     * **Telemetry limitation:** only the first policy that registers a [name] in the registry will
+     * receive [com.santimattius.resilient.telemetry.ResilientEvent.CircuitStateChanged] events via
+     * its `events` [kotlinx.coroutines.flow.SharedFlow]. Subsequent policies reusing the same
+     * registry entry share the breaker state but do not receive telemetry events for it.
+     * Observe the shared breaker directly via [DefaultCircuitBreaker.state] for shared
+     * observability.
+     *
+     * Cannot be combined with [circuitBreaker] in the same builder.
+     */
+    fun circuitBreakerNamed(
+        registry: CircuitBreakerRegistry,
+        name: String,
+        config: CircuitBreakerConfig.() -> Unit
+    ) {
+        require(circuitBreakerConfig == null) {
+            "Cannot use circuitBreakerNamed(...) together with circuitBreaker { }; choose one."
+        }
+        require(circuitBreakerNamedSpec == null) {
+            "circuitBreakerNamed(...) can only be configured once per policy."
+        }
+        circuitBreakerNamedSpec = CircuitBreakerNamedSpec(registry, name, config)
     }
 
     /**
@@ -114,7 +179,31 @@ class ResilientBuilder {
      * @param config Lambda to configure [RateLimiterConfig] (e.g. maxCalls, period).
      */
     fun rateLimiter(config: RateLimiterConfig.() -> Unit) {
+        require(rateLimiterNamedSpec == null) {
+            "Cannot use rateLimiter { } together with rateLimiterNamed(...); choose one."
+        }
         rateLimiterConfig = (rateLimiterConfig ?: RateLimiterConfig()).apply(config)
+    }
+
+    /**
+     * Uses a shared [DefaultRateLimiter] from [registry] keyed by [name].
+     * Multiple policies can pass the same [RateLimiterRegistry] and name to enforce a **global** quota
+     * across those policies.
+     *
+     * Cannot be combined with [rateLimiter] in the same builder.
+     */
+    fun rateLimiterNamed(
+        registry: RateLimiterRegistry,
+        name: String,
+        configure: RateLimiterConfig.() -> Unit
+    ) {
+        require(rateLimiterConfig == null) {
+            "Cannot use rateLimiterNamed(...) together with rateLimiter { }; choose one."
+        }
+        require(rateLimiterNamedSpec == null) {
+            "rateLimiterNamed(...) can only be configured once per policy."
+        }
+        rateLimiterNamedSpec = RateLimiterNamedSpec(registry, name, configure)
     }
 
     /**
@@ -190,6 +279,34 @@ class ResilientBuilder {
     }
 
     /**
+     * Configures the chaos policy for fault injection.
+     *
+     * **Production safeguard**: the policy is only installed when [ChaosConfig.enabled] is explicitly
+     * set to `true`. When disabled (the default), zero overhead is added — no wrapper is created.
+     *
+     * Chaos is positioned as the innermost wrapper (just before the user block) so it directly
+     * controls what the block sees: latency, faults, or overridden results.
+     *
+     * Example:
+     * ```kotlin
+     * resilient(scope) {
+     *     chaos {
+     *         enabled = true          // MUST be set — false by default
+     *         failureRate = 0.3       // 30% of calls throw
+     *         latency = 100.milliseconds
+     *     }
+     * }
+     * ```
+     *
+     * @param block Lambda to configure [ChaosConfig].
+     */
+    @ResilientExperimentalApi
+    fun chaos(block: ChaosConfig.() -> Unit) {
+        @OptIn(ResilientExperimentalApi::class)
+        chaosConfig = (chaosConfig ?: ChaosConfig()).apply(block)
+    }
+
+    /**
      * Configures the order in which policies are composed.
      * Policies are applied from outermost (first in list) to innermost (last in list).
      *
@@ -243,8 +360,10 @@ class ResilientBuilder {
  * 7. `rateLimiter`
  * 8. `bulkhead`
  * 9. `hedging`
+ * 10. `chaos` (only when [ChaosConfig.enabled] is `true`)
  *
- * This means a request will first pass through the `fallback`, then `cache`, then `coalesce`, and then `timeout`, and so on, until it reaches the core execution block, which is wrapped by the `hedging` policy.
+ * This means a request will first pass through the `fallback`, then `cache`, then `coalesce`, and then `timeout`, and so on, until it reaches the core execution block.
+ * The `chaos` policy (when enabled) is the innermost wrapper, injecting faults or latency directly around the user block.
  * The `fallback` policy is the last line of defense, catching any exceptions that bubble up through all other policies.
  *
  * Example: `fallback` -> `cache` -> `coalesce` -> `timeout` -> `retry` -> `...` -> `hedging` -> `block()`
@@ -258,6 +377,7 @@ class ResilientBuilder {
  * @param block A lambda with a [ResilientBuilder] receiver to configure the desired resilience policies.
  * @return A [ResilientPolicy] instance that can be used to execute operations with the configured policies.
  */
+@OptIn(ResilientExperimentalApi::class)
 fun resilient(
     resilientScope: ResilientScope,
     block: ResilientBuilder.() -> Unit
@@ -301,7 +421,14 @@ fun resilient(
         DefaultRetryPolicy(copy)
     }
 
-    val circuitBreaker = builder.circuitBreakerConfig?.let { cfg ->
+    // Named circuit breaker takes precedence over the inline config block.
+    // When the named spec resolves to an existing registry entry, the onStateChanged callback
+    // is set only at creation time — see CircuitBreakerRegistry.getOrCreate telemetry note.
+    val circuitBreaker: DefaultCircuitBreaker? = builder.circuitBreakerNamedSpec?.let { spec ->
+        spec.registry.getOrCreate(spec.name, spec.configure) { new, old ->
+            events.tryEmit(ResilientEvent.CircuitStateChanged(old, new))
+        }
+    } ?: builder.circuitBreakerConfig?.let { cfg ->
         // Clone config so the original is not mutated (avoids duplicate callbacks if config is reused)
         val copy = CircuitBreakerConfig().apply {
             failureThreshold = cfg.failureThreshold
@@ -309,7 +436,10 @@ fun resilient(
             timeout = cfg.timeout
             halfOpenMaxCalls = cfg.halfOpenMaxCalls
             shouldRecordFailure = cfg.shouldRecordFailure
+            shouldRecordResult = cfg.shouldRecordResult
             slidingWindow = cfg.slidingWindow
+            failureRateThreshold = cfg.failureRateThreshold
+            minimumNumberOfCalls = cfg.minimumNumberOfCalls
             onStateChange = { state -> cfg.onStateChange(state) }
         }
         DefaultCircuitBreaker(copy) { new, old ->
@@ -317,7 +447,11 @@ fun resilient(
         }
     }
 
-    val rateLimiter = builder.rateLimiterConfig?.let { cfg ->
+    val rateLimiter = builder.rateLimiterNamedSpec?.let { spec ->
+        spec.registry.getOrCreate(spec.name, spec.configure) { wait ->
+            events.emit(ResilientEvent.RateLimited(wait))
+        }
+    } ?: builder.rateLimiterConfig?.let { cfg ->
         DefaultRateLimiter(
             config = cfg,
             onRateLimited = { wait ->
@@ -350,6 +484,11 @@ fun resilient(
         }
     }
 
+    @OptIn(ResilientExperimentalApi::class)
+    val chaos = builder.chaosConfig?.takeIf { it.enabled }?.let { cfg ->
+        DefaultChaosPolicy(cfg)
+    }
+
     return object : ResilientPolicy {
         override val events: SharedFlow<ResilientEvent>
             get() = events.asSharedFlow()
@@ -359,26 +498,35 @@ fun resilient(
 
         override fun getHealthSnapshot(): PolicyHealthSnapshot = PolicyHealthSnapshot(
             circuitBreaker = circuitBreaker?.snapshot(),
-            bulkhead = bulkhead?.snapshot()
+            bulkhead = bulkhead?.snapshot(),
+            rateLimiter = rateLimiter?.snapshot(),
+            retry = retry?.snapshot(),
+            cache = cache?.snapshot()
         )
 
+        @OptIn(ResilientExperimentalApi::class)
         override suspend fun <T> execute(block: Execute<T>): T {
+            // Deadline intercept: check for a ResilientDeadline in the coroutine context.
+            // Must be read before compose() so we capture the context of the *caller*.
+            val deadline = currentCoroutineContext()[ResilientDeadline.Key]
+            val composed = buildComposed(block)
+
             val mark = TimeSource.Monotonic.markNow()
             return try {
-                val composed = compose(
-                    cache = cache,
-                    coalescing = coalescing,
-                    timeout = timeoutPolicy,
-                    retry = retry,
-                    circuitBreaker = circuitBreaker,
-                    rateLimiter = rateLimiter,
-                    bulkhead = bulkhead,
-                    hedging = hedging,
-                    fallback = fallback,
-                    compositionOrder = builder.compositionOrder,
-                    block = block
-                )
-                val result = composed()
+                val result = if (deadline != null) {
+                    // Compute the effective timeout: min(configured timeout, remaining deadline).
+                    // When remaining <= 0, effectiveTimeoutMs is <= 0 — withTimeout(<=0L)
+                    // throws TimeoutCancellationException immediately without invoking the block.
+                    val remainingMs = deadline.remaining().inWholeMilliseconds
+                    val effectiveTimeoutMs = if (builder.timeoutConfig != null) {
+                        minOf(builder.timeoutConfig!!.timeout.inWholeMilliseconds, remainingMs)
+                    } else {
+                        remainingMs
+                    }
+                    withTimeout(effectiveTimeoutMs.milliseconds) { composed() }
+                } else {
+                    composed()
+                }
                 events.emit(ResilientEvent.OperationSuccess(mark.elapsedNow()))
                 result
             } catch (t: Throwable) {
@@ -387,10 +535,26 @@ fun resilient(
             }
         }
 
+        private fun <T> buildComposed(block: Execute<T>): Execute<T> = compose(
+            cache = cache,
+            coalescing = coalescing,
+            timeout = timeoutPolicy,
+            retry = retry,
+            circuitBreaker = circuitBreaker,
+            rateLimiter = rateLimiter,
+            bulkhead = bulkhead,
+            hedging = hedging,
+            chaos = chaos,
+            fallback = fallback,
+            compositionOrder = builder.compositionOrder,
+            block = block
+        )
+
         override fun close() {
             cache?.close()
         }
 
+        @OptIn(ResilientExperimentalApi::class)
         private fun <T> compose(
             cache: InMemoryCachePolicy?,
             coalescing: DefaultCoalescingPolicy?,
@@ -400,6 +564,7 @@ fun resilient(
             rateLimiter: DefaultRateLimiter?,
             bulkhead: DefaultBulkhead?,
             hedging: DefaultHedgingPolicy?,
+            chaos: DefaultChaosPolicy?,
             fallback: FallbackPolicy?,
             compositionOrder: CompositionOrder,
             block: Execute<T>
@@ -444,10 +609,15 @@ fun resilient(
                         PolicyType.HEDGING -> hedging?.let { policy ->
                             { next: Execute<T> -> suspend { policy.execute { next() } } }
                         }
+
+                        PolicyType.CHAOS -> chaos?.let { policy ->
+                            { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        }
                     }
                 }
             } else {
                 buildList {
+                    if (chaos != null) add { next -> { chaos.execute { next() } } }
                     if (hedging != null) add { next -> { hedging.execute { next() } } }
                     if (bulkhead != null) add { next -> { bulkhead.execute { next() } } }
                     if (rateLimiter != null) add { next -> { rateLimiter.execute { next() } } }

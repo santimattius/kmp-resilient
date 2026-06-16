@@ -22,5 +22,7 @@ enum class OrderablePolicyType {
     /** Bulkhead: limits concurrent executions. */
     BULKHEAD,
     /** Hedging: runs multiple parallel attempts and returns the first success. */
-    HEDGING
+    HEDGING,
+    /** Chaos: injects faults, latency, or overridden results; innermost wrapper. */
+    CHAOS
 }

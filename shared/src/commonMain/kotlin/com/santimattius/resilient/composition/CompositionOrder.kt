@@ -8,7 +8,7 @@ package com.santimattius.resilient.composition
  * This ensures it can catch all failures from other policies.
  *
  * The default order is:
- * Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging
+ * Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → Chaos
  *
  * This order ensures that:
  * - Fallback wraps outermost to handle failures after all policies (always enforced)
@@ -18,7 +18,8 @@ package com.santimattius.resilient.composition
  * - Circuit Breaker prevents hammering failing services
  * - Rate Limiter controls request rate
  * - Bulkhead limits concurrency
- * - Hedging is innermost to launch parallel attempts close to execution
+ * - Hedging runs parallel attempts close to execution
+ * - Chaos is innermost to inject faults/latency directly around the user block
  *
  * @param order The list of orderable policy types in the desired composition order (outermost to innermost).
  *              Optional: may be empty or a subset. Types in the list are ordered as given; any type not in the list
@@ -47,6 +48,7 @@ internal class CompositionOrder(
                 OrderablePolicyType.RATE_LIMITER -> PolicyType.RATE_LIMITER
                 OrderablePolicyType.BULKHEAD -> PolicyType.BULKHEAD
                 OrderablePolicyType.HEDGING -> PolicyType.HEDGING
+                OrderablePolicyType.CHAOS -> PolicyType.CHAOS
             }
         }
     }
@@ -60,10 +62,11 @@ internal class CompositionOrder(
             OrderablePolicyType.CIRCUIT_BREAKER,
             OrderablePolicyType.RATE_LIMITER,
             OrderablePolicyType.BULKHEAD,
-            OrderablePolicyType.HEDGING
+            OrderablePolicyType.HEDGING,
+            OrderablePolicyType.CHAOS
         )
         /**
-         * Default composition order: Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging
+         * Default composition order: Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → Chaos
          */
         val DEFAULT = CompositionOrder(
             listOf(
@@ -74,7 +77,8 @@ internal class CompositionOrder(
                 OrderablePolicyType.CIRCUIT_BREAKER,
                 OrderablePolicyType.RATE_LIMITER,
                 OrderablePolicyType.BULKHEAD,
-                OrderablePolicyType.HEDGING
+                OrderablePolicyType.HEDGING,
+                OrderablePolicyType.CHAOS
             )
         )
     }

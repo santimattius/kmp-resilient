@@ -7,6 +7,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+### Added
+
+- **Ktor HTTP Client Plugin** *(new artifact: `resilient-ktor`)*
+  - `ResilientPlugin`: Ktor 3.x `HttpClient` plugin that applies a `ResilientPolicy` to every outgoing HTTP request via the `on(Send)` hook — no code changes to the policy engine.
+  - **BYO policy mode**: `install(ResilientPlugin) { policy = yourPolicy }` — bring a pre-built policy; the plugin does not close it on `HttpClient.close()`.
+  - **Inline DSL mode**: `install(ResilientPlugin) { scope = ...; retry { }; circuitBreaker { } }` — plugin builds and owns the policy, closing it automatically on `HttpClient.close()`.
+  - `shouldRetryOnStatus: (HttpStatusCode) -> Boolean` (default: `{ it.value >= 500 }`) — status-based retry without requiring `expectSuccess = true`; bridged into `RetryPolicyConfig.shouldRetryResult`.
+  - `retryOnlyIdempotent = true` (default): POST and PATCH requests bypass the entire policy (retry, circuit breaker, timeout) to preserve at-most-once semantics.
+  - Full KMP support: Android, JVM, JS (browser+node), iOS (x64/arm64/simulatorArm64), macOS (arm64).
+  - Requires Ktor 3.x (`io.ktor:ktor-client-core:3.2.0+`).
+- **Telemetry Export modules** *(new artifacts: `resilient-otel`, `resilient-micrometer`)*
+  - `resilient-otel`: JVM-only module exporting `SharedFlow<ResilientEvent>` to OpenTelemetry counters via `exportToOpenTelemetry(meter, scope)`.
+  - `resilient-micrometer`: JVM-only module exporting `SharedFlow<ResilientEvent>` to Micrometer counters via `exportToMicrometer(registry, scope)`.
+  - Both APIs are `@ResilientExperimentalApi`. The returned `Job` gives callers full control over the export lifecycle: cancelling the job stops event collection.
+  - Metrics covered: `resilient.retry.attempts`, `resilient.circuit_breaker.state_changes`, `resilient.rate_limiter.limited`, `resilient.bulkhead.rejected`, `resilient.operation.success`, `resilient.operation.failure`, `resilient.cache.hits`, `resilient.cache.misses`, `resilient.timeout.triggered`, `resilient.hedging.used`, `resilient.fallback.triggered`.
+- **Deadline Propagation** (`@ResilientExperimentalApi`)
+  - New `ResilientDeadline` coroutine context element for propagating a deadline across the resilient policy pipeline.
+  - `ResilientDeadline.after(duration)` factory creates a deadline that expires after the given duration from now.
+  - When `ResilientDeadline` is present in the coroutine context, `ResilientPolicy.execute` enforces it automatically:
+    - If the deadline has already expired, `TimeoutCancellationException` is thrown immediately without invoking the block.
+    - If both a deadline and an explicit `timeout { }` are configured, the shorter of the two wins (`min(timeout, remaining)`).
+  - Fully KMP — implemented in `commonMain` using `kotlin.time.TimeMark` and `withTimeout`.
+- **Chaos Policy** *(experimental — `@ResilientExperimentalApi`)*
+  - `ChaosConfig`: DSL config for fault injection with `enabled` (defaults to `false` — production safeguard), `failureRate` (0.0–1.0), `latency` (`Duration?`), `exception` factory, and `injectResult` override.
+  - `DefaultChaosPolicy`: innermost wrapper that injects latency, random faults, or overridden return values. Zero overhead when `enabled = false` — no wrapper is installed.
+  - `ResilientBuilder.chaos { }` DSL function to configure chaos within a `resilient { }` block.
+  - `OrderablePolicyType.CHAOS` appended after `BULKHEAD` in the default composition order.
+  - Chaos is positioned as the innermost policy (wraps the user block directly) so it controls exactly what the block sees.
+
+---
+
+## [1.5.0] - 2026-06-06
+
+### Added
+
+- **Retry — DecorrelatedJitterBackoff**
+  - New `DecorrelatedJitterBackoff(base: Duration, cap: Duration)` backoff strategy implementing `BackoffStrategy`.
+  - Uses a stateless approximation of the AWS decorrelated jitter formula: `min(cap, random(base, base * 3^(attempt-1)))`, safe for use across concurrent `execute()` calls on shared policy instances.
+  - Enforces `base > Duration.ZERO` and `cap >= base` at construction time; violating either throws `IllegalArgumentException`.
+  - Available in `commonMain` with no platform-specific dependencies.
+- **Richer PolicyHealthSnapshot**
+  - `RateLimiterSnapshot(remainingCalls: Int, timeToRefill: Duration)` — exposes current token count and time until the next bucket refill.
+  - `RetrySnapshot(maxAttempts: Int)` — exposes the configured maximum attempt count.
+  - `CacheSnapshot(entryCount: Int, hitRate: Double)` — exposes current cache entry count and cumulative hit rate (`Double.NaN` when no calls have been made yet).
+  - `PolicyHealthSnapshot` gains three nullable trailing fields (`rateLimiter`, `retry`, `cache`) with `null` defaults — source-compatible with existing consumers.
+  - `DefaultRateLimiter.snapshot()` reads `@Volatile` token state for a non-blocking, approximation-safe snapshot.
+  - `DefaultRetryPolicy.snapshot()` reflects the immutable `maxAttempts` configuration.
+  - `InMemoryCachePolicy` tracks cumulative `hitCount` and `missCount` (written under the internal mutex); `snapshot()` computes `hitRate` from those counters as an approximation suitable for health endpoints.
+- **CircuitBreakerRegistry**
+  - `CircuitBreakerRegistry` for named, shared circuit breaker instances so multiple policies can share the same breaker state (e.g. all calls to `"payments"` trip a single breaker).
+  - `ResilientBuilder.circuitBreakerNamed(registry, name, config)` DSL — mutually exclusive with `circuitBreaker { }`.
+- **Telemetry note:** only the first policy that registers a name in the registry receives `CircuitStateChanged` telemetry events via its `events` SharedFlow. Subsequent policies reusing the same entry share the breaker state but not its telemetry callback. Observe shared state directly via `DefaultCircuitBreaker.state`.
+- **Circuit Breaker — result-based failure recording**
+  - `CircuitBreakerConfig.shouldRecordResult`: optional predicate `((Any?) -> Boolean)?` evaluated after the block returns without throwing. When `true`, the returned value counts as a failure (incrementing the failure counter and potentially opening the circuit) while the value is still returned to the caller unchanged. Default `null` preserves existing behaviour — zero regression.
+  - This predicate is independent of `shouldRecordFailure`: `shouldRecordFailure` governs the exception path; `shouldRecordResult` governs the success-value path.
+- **Circuit Breaker — failure-rate sliding window mode**
+  - `CircuitBreakerConfig.failureRateThreshold: Double?` (0.0–100.0, default `null`): enables count-based failure-rate mode. The circuit opens when the failure rate computed over the last `minimumNumberOfCalls` outcomes meets or exceeds this percentage.
+  - `CircuitBreakerConfig.minimumNumberOfCalls: Int` (default `10`): minimum number of call outcomes that must be recorded before the failure rate is evaluated. Also defines the ring-buffer window size.
+  - Setting both `failureRateThreshold` and `slidingWindow` in the same config throws `IllegalArgumentException`.
+  - Half-open recovery (`successThreshold`) and the existing consecutive-failure and time-based sliding-window modes are unchanged.
+- `CoroutineScope.asResilientScope()` — creates a child `ResilientScope` linked to an existing `CoroutineScope`. Cancelling the outer scope cancels all internal background jobs (cache cleanup, coalescing). Use with `viewModelScope` or `lifecycleScope` to eliminate manual `ResilientScope` lifecycle management.
+- `CoroutineScope.resilient(block)` — shorthand extension that wraps `.asResilientScope()` + `resilient(scope, block)` in one call.
+- **RateLimiterRegistry**
+  - `RateLimiterRegistry` for named, shared rate-limiter instances so multiple policies can share the same token-bucket quota (e.g. all `"payments"` calls consume from the same pool).
+  - `getOrCreate(name, configure, onRateLimited?)` follows a first-name-wins contract: the first call for a given name creates the limiter; subsequent calls return the same instance and ignore the configure block. Not synchronized across threads (startup-time construct, matching `BulkheadRegistry` contract).
+  - `ResilientBuilder.rateLimiterNamed(registry, name, configure)` DSL — mutually exclusive with `rateLimiter { }`. Throws `IllegalArgumentException` at build time if both are configured.
+- **resilient-test — FaultInjector: deterministic `failCount`**
+  - `FaultInjector.Builder.failCount(n: Int)`: fails the first `n` calls deterministically, then always succeeds. Takes precedence over `failureRate` when > 0.
+  - Preferred over `failureRate` for unit tests — eliminates probabilistic flakiness (e.g. `failureRate(0.6)` with `maxAttempts = 5` had a ~7.8% chance of exhausting all retries).
+
 ## [1.4.0] - 2026-03-22
 
 ### Added
@@ -147,6 +217,7 @@ Planned items: cache (dynamic key, invalidation), timeout (documentation and per
 
 ---
 
+[1.5.0]: https://github.com/santimattius/kmp-resilient/compare/1.4.0...1.5.0
 [1.4.0]: https://github.com/santimattius/kmp-resilient/compare/1.3.0...1.4.0
 [1.3.0-ALPHA01]: https://github.com/santimattius/kmp-resilient/compare/1.2.0...1.3.0-ALPHA01
 [1.2.0]: https://github.com/santimattius/kmp-resilient/compare/1.1.0...1.2.0
