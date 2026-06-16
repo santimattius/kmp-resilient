@@ -24,6 +24,7 @@ kotlinxDatetime = "0.7.1"
 turbine = "1.2.1"
 opentelemetry = "1.48.0"
 micrometer = "1.14.4"
+ktor = "3.2.0"
 
 [libraries]
 #Android
@@ -60,6 +61,10 @@ opentelemetry-sdk-testing = { module = "io.opentelemetry:opentelemetry-sdk-testi
 
 #Micrometer
 micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
+
+#Ktor
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 #Kotlin Testing
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
