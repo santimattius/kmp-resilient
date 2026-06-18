@@ -7,6 +7,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+### Added
+
+- **Ktor HTTP Client Plugin** *(new artifact: `resilient-ktor`)*
+  - `ResilientPlugin`: Ktor 3.x `HttpClient` plugin that applies a `ResilientPolicy` to every outgoing HTTP request via the `on(Send)` hook — no code changes to the policy engine.
+  - **BYO policy mode**: `install(ResilientPlugin) { policy = yourPolicy }` — bring a pre-built policy; the plugin does not close it on `HttpClient.close()`.
+  - **Inline DSL mode**: `install(ResilientPlugin) { scope = ...; retry { }; circuitBreaker { } }` — plugin builds and owns the policy, closing it automatically on `HttpClient.close()`.
+  - `shouldRetryOnStatus: (HttpStatusCode) -> Boolean` (default: `{ it.value >= 500 }`) — status-based retry without requiring `expectSuccess = true`; bridged into `RetryPolicyConfig.shouldRetryResult`.
+  - `retryOnlyIdempotent = true` (default): POST and PATCH requests bypass the entire policy (retry, circuit breaker, timeout) to preserve at-most-once semantics.
+  - Full KMP support: Android, JVM, JS (browser+node), iOS (x64/arm64/simulatorArm64), macOS (arm64).
+  - Requires Ktor 3.x (`io.ktor:ktor-client-core:3.2.0+`).
+- **Telemetry Export modules** *(new artifacts: `resilient-otel`, `resilient-micrometer`)*
+  - `resilient-otel`: JVM-only module exporting `SharedFlow<ResilientEvent>` to OpenTelemetry counters via `exportToOpenTelemetry(meter, scope)`.
+  - `resilient-micrometer`: JVM-only module exporting `SharedFlow<ResilientEvent>` to Micrometer counters via `exportToMicrometer(registry, scope)`.
+  - Both APIs are `@ResilientExperimentalApi`. The returned `Job` gives callers full control over the export lifecycle: cancelling the job stops event collection.
+  - Metrics covered: `resilient.retry.attempts`, `resilient.circuit_breaker.state_changes`, `resilient.rate_limiter.limited`, `resilient.bulkhead.rejected`, `resilient.operation.success`, `resilient.operation.failure`, `resilient.cache.hits`, `resilient.cache.misses`, `resilient.timeout.triggered`, `resilient.hedging.used`, `resilient.fallback.triggered`.
+- **Deadline Propagation** (`@ResilientExperimentalApi`)
+  - New `ResilientDeadline` coroutine context element for propagating a deadline across the resilient policy pipeline.
+  - `ResilientDeadline.after(duration)` factory creates a deadline that expires after the given duration from now.
+  - When `ResilientDeadline` is present in the coroutine context, `ResilientPolicy.execute` enforces it automatically:
+    - If the deadline has already expired, `TimeoutCancellationException` is thrown immediately without invoking the block.
+    - If both a deadline and an explicit `timeout { }` are configured, the shorter of the two wins (`min(timeout, remaining)`).
+  - Fully KMP — implemented in `commonMain` using `kotlin.time.TimeMark` and `withTimeout`.
+- **Chaos Policy** *(experimental — `@ResilientExperimentalApi`)*
+  - `ChaosConfig`: DSL config for fault injection with `enabled` (defaults to `false` — production safeguard), `failureRate` (0.0–1.0), `latency` (`Duration?`), `exception` factory, and `injectResult` override.
+  - `DefaultChaosPolicy`: innermost wrapper that injects latency, random faults, or overridden return values. Zero overhead when `enabled = false` — no wrapper is installed.
+  - `ResilientBuilder.chaos { }` DSL function to configure chaos within a `resilient { }` block.
+  - `OrderablePolicyType.CHAOS` appended after `BULKHEAD` in the default composition order.
+  - Chaos is positioned as the innermost policy (wraps the user block directly) so it controls exactly what the block sees.
+
 ---
 
 ## [1.5.0] - 2026-06-06

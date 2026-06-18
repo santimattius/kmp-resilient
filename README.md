@@ -391,13 +391,63 @@ val policy = resilient {
 suspend fun load(): User = policy.execute { loadProfile() }
 ```
 
+## Ktor HTTP Client Integration
+
+The `resilient-ktor` module provides a Ktor 3.x `HttpClient` plugin that applies a `ResilientPolicy` transparently to every outgoing request.
+
+```kotlin
+// Gradle (commonMain)
+implementation("io.github.santimattius.resilient:resilient-ktor:<version>")
+```
+
+### Inline DSL (plugin creates and owns the policy)
+```kotlin
+val client = HttpClient {
+    install(ResilientPlugin) {
+        scope = viewModelScope.asResilientScope()
+        retry { maxAttempts = 3 }
+        circuitBreaker { failureThreshold = 5 }
+        timeout { timeout = 10.seconds }
+        shouldRetryOnStatus = { it.value >= 500 } // default
+        retryOnlyIdempotent = true                // default: POST/PATCH bypass policy
+    }
+}
+```
+
+### BYO policy (bring your own pre-built policy)
+```kotlin
+val policy = viewModelScope.resilient {
+    retry {
+        maxAttempts = 3
+        shouldRetryResult = { result ->
+            (result as? HttpClientCall)?.response?.status?.value?.let { it >= 500 } ?: false
+        }
+    }
+    circuitBreaker { failureThreshold = 5 }
+}
+
+val client = HttpClient {
+    install(ResilientPlugin) { policy = policy }
+}
+
+// Observe telemetry directly from the policy
+scope.launch { policy.events.collect { println(it) } }
+```
+
+**Notes:**
+- Requires Ktor 3.x (`io.ktor:ktor-client-core:3.2.0+`). Ktor 2.x is not supported.
+- `shouldRetryOnStatus` only applies in inline DSL mode. BYO policy users must wire `shouldRetryResult` inside the policy's own `RetryPolicyConfig`.
+- `retryOnlyIdempotent = true` skips the entire policy (retry, circuit breaker, timeout) for POST and PATCH — not just retry — to preserve at-most-once semantics.
+- `hedging` is not supported in Ktor plugin context (incompatible with single-request `on(Send)` hook).
+
 ## Android (Compose) Example
 A ready-to-run sample is available at:
-- `androidApp/src/main/kotlin/com/santimattius/kmp/ResilientExample.kt`
+- `androidApp/src/main/kotlin/com/santimattius/kmp/ResilientExample.kt` — core policy demo
+- `androidApp/src/main/kotlin/com/santimattius/kmp/KtorDemoScreen.kt` — Ktor plugin demo (503 → 503 → 200 retry sequence)
 
 Use it from `MainActivity`:
 ```kotlin
-setContent { ResilientExample() }
+setContent { DemoApp() } // tab navigation: Policy Demo | Ktor Plugin
 ```
 
 ## Best Practices
