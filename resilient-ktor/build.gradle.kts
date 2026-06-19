@@ -11,7 +11,7 @@ kotlin {
     android {
         namespace = "io.github.santimattius.resilient.ktor"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        minSdk = 30
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)

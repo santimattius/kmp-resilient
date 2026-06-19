@@ -2,6 +2,35 @@
 
 A Kotlin Multiplatform library providing resilience patterns (Timeout, Retry, Circuit Breaker, Rate Limiter, Bulkhead, Hedging, Cache, Fallback) for suspend functions. Compose them declaratively with a small DSL and observe runtime telemetry via Flow.
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Telemetry](#telemetry)
+- [Composition Order](#composition-order)
+  - [Custom Composition Order](#custom-composition-order)
+  - [Timeout vs Retry order](#timeout-vs-retry-order)
+- [Features](#features)
+  - [Timeout](#timeout)
+  - [Retry](#retry)
+  - [Circuit Breaker](#circuit-breaker)
+  - [Rate Limiter](#rate-limiter)
+  - [Bulkhead](#bulkhead)
+  - [Hedging](#hedging)
+  - [Cache (In-Memory TTL)](#cache-in-memory-ttl)
+  - [Coalescing (Request Deduplication)](#coalescing-request-deduplication)
+  - [CoroutineScope Binding](#coroutinescope-binding)
+  - [Health / Readiness](#health--readiness)
+  - [Fallback](#fallback)
+- [Combined Example](#combined-example)
+- [Ktor HTTP Client Integration](#ktor-http-client-integration)
+- [Android (Compose) Example](#android-compose-example)
+- [Best Practices](#best-practices)
+- [Testing with `resilient-test`](#testing-with-resilient-test)
+- [Pattern Reference](#pattern-reference)
+- [Contributing](#contributing)
+
+---
+
 ## Quick Start
 ```kotlin
 import com.santimattius.resilient.composition.resilient
