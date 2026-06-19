@@ -21,8 +21,13 @@ A Kotlin Multiplatform library providing resilience patterns (Timeout, Retry, Ci
   - [CoroutineScope Binding](#coroutinescope-binding)
   - [Health / Readiness](#health--readiness)
   - [Fallback](#fallback)
+  - [Chaos Policy (Experimental)](#chaos-policy-experimental)
+  - [Deadline Propagation (Experimental)](#deadline-propagation-experimental)
 - [Combined Example](#combined-example)
 - [Ktor HTTP Client Integration](#ktor-http-client-integration)
+- [Telemetry Exporters](#telemetry-exporters)
+  - [OpenTelemetry](#opentelemetry)
+  - [Micrometer](#micrometer)
 - [Android (Compose) Example](#android-compose-example)
 - [Best Practices](#best-practices)
 - [Testing with `resilient-test`](#testing-with-resilient-test)
@@ -399,6 +404,53 @@ val policy = resilient {
 ```
 → [In-depth documentation](docs/patterns/fallback.md)
 
+### Chaos Policy (Experimental)
+
+> **Requires `@OptIn(ResilientExperimentalApi::class)`**
+
+Injects faults, latency, or result overrides into an operation for chaos engineering and resilience validation. The wrapper is only installed when `enabled = true` — zero overhead in production when disabled (the default).
+
+```kotlin
+import com.santimattius.resilient.annotations.ResilientExperimentalApi
+
+@OptIn(ResilientExperimentalApi::class)
+val policy = resilient(scope) {
+    chaos {
+        enabled      = true
+        failureRate  = 0.3                   // 30% of calls throw
+        latency      = 200.milliseconds      // inject 200ms delay before every call
+        exception    = { IOException("chaos: simulated network failure") }
+        // injectResult = { "override" }     // replace the block's return value (optional)
+    }
+    retry { maxAttempts = 3 }
+}
+```
+
+**Configuration:**
+- `enabled` — must be `true` to activate; defaults to `false` (no-op)
+- `failureRate` — probability of throwing per call (`0.0` = never, `1.0` = always); ignored when `enabled = false`
+- `latency` — fixed delay injected before executing the block; `null` means no delay
+- `exception` — factory for the thrown exception; defaults to `RuntimeException("Chaos fault injected")`
+- `injectResult` — if set, the block still runs but its return value is discarded and replaced by this factory's output
+
+### Deadline Propagation (Experimental)
+
+> **Requires `@OptIn(ResilientExperimentalApi::class)`**
+
+Carries a wall-clock deadline in the coroutine context. When `ResilientDeadline` is present, `policy.execute` enforces it: if the deadline has already expired on entry, a `TimeoutCancellationException` is thrown immediately. If both `timeout { }` and a deadline are configured, the **shorter** of the two wins.
+
+```kotlin
+import com.santimattius.resilient.annotations.ResilientExperimentalApi
+import com.santimattius.resilient.deadline.ResilientDeadline
+
+@OptIn(ResilientExperimentalApi::class)
+withContext(ResilientDeadline.after(5.seconds)) {
+    policy.execute { callRemoteService() }
+}
+```
+
+Use this to propagate a single end-to-end deadline across multiple policy calls inside one coroutine scope — useful for request-scoped deadlines in servers or complex call chains where each individual timeout would be redundant.
+
 ---
 
 ## Combined Example
@@ -468,6 +520,68 @@ scope.launch { policy.events.collect { println(it) } }
 - `shouldRetryOnStatus` only applies in inline DSL mode. BYO policy users must wire `shouldRetryResult` inside the policy's own `RetryPolicyConfig`.
 - `retryOnlyIdempotent = true` skips the entire policy (retry, circuit breaker, timeout) for POST and PATCH — not just retry — to preserve at-most-once semantics.
 - `hedging` is not supported in Ktor plugin context (incompatible with single-request `on(Send)` hook).
+
+## Telemetry Exporters
+
+The `resilient-otel` and `resilient-micrometer` modules bridge `policy.events` (a `SharedFlow<ResilientEvent>`) into your observability backend. Both are **JVM-only** and marked `@ResilientExperimentalApi`.
+
+> **Requires `@OptIn(ResilientExperimentalApi::class)`**
+
+### OpenTelemetry
+
+Exports each `ResilientEvent` to an OpenTelemetry `Meter` as a named counter. Depends on `io.opentelemetry:opentelemetry-api`.
+
+```kotlin
+import com.santimattius.resilient.annotations.ResilientExperimentalApi
+import com.santimattius.resilient.otel.exportToOpenTelemetry
+
+@OptIn(ResilientExperimentalApi::class)
+val exportJob = policy.events.exportToOpenTelemetry(
+    meter = openTelemetry.getMeter("my-service"),
+    scope = applicationScope          // cancel to stop exporting
+)
+
+// Stop exporting
+exportJob.cancel()
+```
+
+**Counters registered:**
+
+| Counter | Event |
+|---|---|
+| `resilient.retry.attempts` | `RetryAttempt` |
+| `resilient.circuit_breaker.state_changes` | `CircuitStateChanged` |
+| `resilient.rate_limiter.limited` | `RateLimited` |
+| `resilient.bulkhead.rejected` | `BulkheadRejected` |
+| `resilient.operation.success` | `OperationSuccess` |
+| `resilient.operation.failure` | `OperationFailure` |
+| `resilient.cache.hits` | `CacheHit` |
+| `resilient.cache.misses` | `CacheMiss` |
+| `resilient.timeout.triggered` | `TimeoutTriggered` |
+| `resilient.hedging.used` | `HedgingUsed` |
+| `resilient.fallback.triggered` | `FallbackTriggered` |
+
+### Micrometer
+
+Exports each `ResilientEvent` to a Micrometer `MeterRegistry` as named counters with tags. Depends on `io.micrometer:micrometer-core`.
+
+```kotlin
+import com.santimattius.resilient.annotations.ResilientExperimentalApi
+import com.santimattius.resilient.micrometer.exportToMicrometer
+
+@OptIn(ResilientExperimentalApi::class)
+val exportJob = policy.events.exportToMicrometer(
+    registry = meterRegistry,
+    scope    = applicationScope       // cancel to stop exporting
+)
+
+// Stop exporting
+exportJob.cancel()
+```
+
+Micrometer counters carry additional tags where available — for example, `CircuitStateChanged` includes `from` and `to` tags (circuit breaker state names), and `RetryAttempt` includes the `attempt` number.
+
+---
 
 ## Android (Compose) Example
 A ready-to-run sample is available at:
