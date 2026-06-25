@@ -47,6 +47,15 @@ benchmark {
             mode = "avgt"           // AverageTime
             outputTimeUnit = "us"   // MICROSECONDS
         }
+        register("smoke") {
+            // Fast CI sanity check: verifies benchmarks compile and execute, not precision.
+            warmups = 0
+            iterations = 1
+            iterationTime = 1
+            iterationTimeUnit = "s"
+            mode = "avgt"
+            outputTimeUnit = "us"
+        }
     }
     targets {
         register("jvm")

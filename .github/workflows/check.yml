@@ -18,3 +18,23 @@ jobs:
           java-version: 21
       - name: Check
         run: ./gradlew :shared:check
+
+  benchmark:
+    name: Benchmark Smoke
+    runs-on: macOS-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: 21
+      - name: Run benchmark smoke
+        run: ./gradlew :benchmark:jvmSmokeBenchmark
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-smoke
+          path: benchmark/build/reports/benchmarks/smoke/
+          if-no-files-found: error
