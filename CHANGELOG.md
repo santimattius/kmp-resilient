@@ -9,6 +9,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Benchmark module** *(new module: `:benchmark` — not published)*
+  - Standalone `:benchmark` module using `kotlinx-benchmark 0.4.17` for reproducible, microsecond-resolution performance measurements.
+  - `RetryBenchmark`: measures `RetryPolicy.execute` throughput under immediate success, single transient failure, and full-retry-exhaust scenarios.
+  - `CircuitBreakerBenchmark`: measures `CircuitBreaker.execute` throughput when CLOSED (happy-path), OPEN (fast-reject), and HALF_OPEN (recovery probe) states.
+  - Targets: JVM (primary), macOS arm64, JS/Node.js — matching the `:shared` KMP target matrix.
+  - CI smoke job (`benchmark-smoke`) runs `jvmBenchmark` on every PR to catch performance regressions early.
+
+### Changed
+
+- **Dependencies**
+  - Kotlin `2.4.0`
+  - Android Gradle Plugin `9.2.1`
+  - Kotlinx Coroutines `1.11.0`
+  - Ktor `3.5.0`
+  - Gradle Wrapper `9.4.1`
+
+---
+
+## [2.0.0-ALPHA01] - 2026-06-19
+
+### Added
+
 - **Ktor HTTP Client Plugin** *(new artifact: `resilient-ktor`)*
   - `ResilientPlugin`: Ktor 3.x `HttpClient` plugin that applies a `ResilientPolicy` to every outgoing HTTP request via the `on(Send)` hook — no code changes to the policy engine.
   - **BYO policy mode**: `install(ResilientPlugin) { policy = yourPolicy }` — bring a pre-built policy; the plugin does not close it on `HttpClient.close()`.
@@ -217,6 +239,7 @@ Planned items: cache (dynamic key, invalidation), timeout (documentation and per
 
 ---
 
+[2.0.0-ALPHA01]: https://github.com/santimattius/kmp-resilient/compare/1.5.0...2.0.0-ALPHA01
 [1.5.0]: https://github.com/santimattius/kmp-resilient/compare/1.4.0...1.5.0
 [1.4.0]: https://github.com/santimattius/kmp-resilient/compare/1.3.0...1.4.0
 [1.3.0-ALPHA01]: https://github.com/santimattius/kmp-resilient/compare/1.2.0...1.3.0-ALPHA01
