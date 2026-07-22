@@ -31,7 +31,7 @@ import kotlin.time.Duration
 class RetryPolicyBenchmark {
 
     @Param("1", "3", "5")
-    var maxAttempts: Int = 1
+    var localMaxAttempts: Int = 1
 
     private lateinit var policy: RetryPolicy
 
@@ -39,7 +39,7 @@ class RetryPolicyBenchmark {
     fun setup() {
         policy = DefaultRetryPolicy(
             RetryPolicyConfig().apply {
-                this.maxAttempts = maxAttempts
+                this.maxAttempts = localMaxAttempts
                 backoffStrategy = FixedBackoff(Duration.ZERO)
             }
         )
