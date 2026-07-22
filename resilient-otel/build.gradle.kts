@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    alias(libs.plugins.mavenPublish)
 }
 
 kotlin {
@@ -21,4 +22,12 @@ dependencies {
 
 tasks.test {
     useJUnit()
+}
+
+mavenPublishing {
+    coordinates(
+        groupId = project.group.toString(),
+        artifactId = "resilient-otel",
+        version = project.version.toString()
+    )
 }
