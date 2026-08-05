@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKMPLibrary)
     alias(libs.plugins.mavenPublish)
+    alias(libs.plugins.dokka)
 }
 
 kotlin {
