@@ -2,6 +2,7 @@
 agp = "9.2.1"
 kotlin = "2.4.0"
 mavenPublish = "0.36.0"
+dokka = "2.2.0"
 android-compileSdk = "37"
 android-minSdk = "24"
 android-targetSdk = "37"
@@ -91,3 +92,4 @@ kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinxBenchmark = { id = "org.jetbrains.kotlinx.benchmark", version.ref = "kotlinxBenchmark" }
 mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPublish" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

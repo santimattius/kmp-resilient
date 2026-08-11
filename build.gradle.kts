@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.mavenPublish) apply false
     alias(libs.plugins.allOpen) apply false
     alias(libs.plugins.kotlinxBenchmark) apply false
+    alias(libs.plugins.dokka)
 }
 
 allprojects {
@@ -19,4 +20,12 @@ allprojects {
         mavenCentral()
         google()
     }
+}
+
+dependencies {
+    dokka(project(":shared"))
+    dokka(project(":resilient-test"))
+    dokka(project(":resilient-ktor"))
+    dokka(project(":resilient-micrometer"))
+    dokka(project(":resilient-otel"))
 }
