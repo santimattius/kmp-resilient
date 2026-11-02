@@ -9,12 +9,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Keyed Rate Limiter**
+  - Typed `KeyedRateLimiter<C, K>` and `keyedRateLimiter<C, K> { ... }` DSL for independent per-key quotas.
+  - Bounded bucket cardinality with idle TTL and inactive-only LRU eviction.
+  - Active and waiting buckets remain resident; capacity errors and callbacks do not expose raw keys.
 - **Benchmark module** *(new module: `:benchmark` — not published)*
   - Standalone `:benchmark` module using `kotlinx-benchmark 0.4.17` for reproducible, microsecond-resolution performance measurements.
   - `RetryBenchmark`: measures `RetryPolicy.execute` throughput under immediate success, single transient failure, and full-retry-exhaust scenarios.
   - `CircuitBreakerBenchmark`: measures `CircuitBreaker.execute` throughput when CLOSED (happy-path), OPEN (fast-reject), and HALF_OPEN (recovery probe) states.
   - Targets: JVM (primary), macOS arm64, JS/Node.js — matching the `:shared` KMP target matrix.
   - CI smoke job (`benchmark-smoke`) runs `jvmBenchmark` on every PR to catch performance regressions early.
+
+### Fixed
+
+- **Rate Limiter**
+  - Concurrent waiters now receive at most one refilled permit per configured window while sharing the original timeout budget.
 
 ### Changed
 
