@@ -80,52 +80,57 @@ class DefaultRateLimiter(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override suspend fun <T> execute(block: suspend () -> T): T {
-        // Try to acquire token immediately
-        val waitDuration = mutex.withLock {
+        var waitedForRefillAtMs = 0L
+        var waitDuration: Duration? = mutex.withLock {
             refillTokens()
             if (tokens > 0) {
                 tokens--
-                return@withLock null
+                null
             } else {
-                val nextInMs = remainingMillisInWindow()
-                nextInMs.milliseconds
+                waitedForRefillAtMs = lastRefillMs
+                remainingMillisInWindow().milliseconds
             }
         }
 
-        // If we need to wait, handle timeout and wait
         if (waitDuration != null) {
             onRateLimited(waitDuration)
             config.onRateLimited()
+            var remainingTimeout = config.timeoutWhenLimited
 
-            when (val timeout = config.timeoutWhenLimited) {
-                null -> throw RateLimitExceededException(waitDuration)
-                else -> {
-                    if (waitDuration > timeout) {
-                        throw RateLimitExceededException(waitDuration)
-                    }
-                    coroutineScope {
-                        val delayDeferred = async { delay(waitDuration.inWholeMilliseconds) }
-                        select {
-                            delayDeferred.onAwait { }
-                            onTimeout(timeout.inWholeMilliseconds) {
-                                delayDeferred.cancel()
-                                throw RateLimitExceededException(waitDuration)
-                            }
+            while (true) {
+                val currentWaitDuration = waitDuration ?: break
+                when (val timeout = remainingTimeout) {
+                    null -> throw RateLimitExceededException(currentWaitDuration)
+                    else -> {
+                        if (currentWaitDuration > timeout) {
+                            throw RateLimitExceededException(currentWaitDuration)
                         }
-                        delayDeferred.await()
-                    }
-
-                    mutex.withLock {
-                        val periodMs = config.period.inWholeMilliseconds
-                        lastRefillMs += periodMs
-                        // Add tokens for the period that just started
-                        tokens = min(config.maxCalls, tokens + config.maxCalls)
-                        // Now consume a token
-                        if (tokens > 0) {
-                            tokens--
-                        } else {
-                            // This shouldn't happen, but handle it gracefully
-                            throw RateLimitExceededException(remainingMillisInWindow().milliseconds)
+                        coroutineScope {
+                            val delayDeferred = async { delay(currentWaitDuration.inWholeMilliseconds) }
+                            select {
+                                delayDeferred.onAwait { }
+                                onTimeout(timeout.inWholeMilliseconds) {
+                                    delayDeferred.cancel()
+                                    throw RateLimitExceededException(currentWaitDuration)
+                                }
+                            }
+                            delayDeferred.await()
+                        }
+                        remainingTimeout = timeout - currentWaitDuration
+                        waitDuration = mutex.withLock {
+                            refillTokens()
+                            if (tokens == 0 && lastRefillMs == waitedForRefillAtMs) {
+                                val periodMs = config.period.inWholeMilliseconds
+                                lastRefillMs += periodMs
+                                tokens = min(config.maxCalls, tokens + config.maxCalls)
+                            }
+                            if (tokens > 0) {
+                                tokens--
+                                null
+                            } else {
+                                waitedForRefillAtMs = lastRefillMs
+                                remainingMillisInWindow().milliseconds
+                            }
                         }
                     }
                 }

@@ -244,6 +244,8 @@ val policyB = resilient(scope) {
     rateLimiterNamed(rateLimiters, "payments") { } // same instance as policyA
 }
 ```
+**Keyed rate limiter:** use `keyedRateLimiter<C, K> { ... }` when each typed request context selects an independent per-key quota. Configure `keyProvider`, `maxBuckets`, and `bucketIdleTtl`; idle buckets expire and only inactive least-recently-used buckets are evicted at capacity. See [keyed rate limiting](docs/patterns/rate-limiter.md#keyed-rate-limiter) for the API, composition with a global limiter, capacity behavior, and telemetry privacy guidance.
+
 → [In-depth documentation](docs/patterns/rate-limiter.md)
 
 ### Bulkhead

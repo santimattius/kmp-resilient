@@ -12,6 +12,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -569,6 +570,49 @@ class RateLimiterTest {
     }
 
     @Test
+    fun `given simultaneous waiters when one permit refills then only one executes per window`() = runTest {
+        // given
+        val testTimeSource = TestTimeSource()
+        testTimeSource.setTime(0)
+        val cfg = RateLimiterConfig().apply {
+            maxCalls = 1
+            period = 50.milliseconds
+            timeoutWhenLimited = 200.milliseconds
+        }
+        val rateLimiter = DefaultRateLimiter(cfg, timeSource = testTimeSource)
+        val executionTimes = mutableListOf<Long>()
+        rateLimiter.execute { "first" }
+
+        // when - both waiters reach the same refill frontier
+        val firstWaiter = async {
+            rateLimiter.execute {
+                executionTimes += testScheduler.currentTime
+                "first-waiter"
+            }
+        }
+        val secondWaiter = async {
+            rateLimiter.execute {
+                executionTimes += testScheduler.currentTime
+                "second-waiter"
+            }
+        }
+        runCurrent()
+        testTimeSource.advanceTimeBy(50)
+        advanceTimeBy(50)
+        runCurrent()
+
+        // then - one permit permits only one waiter at the first frontier
+        assertEquals(listOf(50L), executionTimes)
+
+        // and the other waiter receives the permit at the following frontier
+        testTimeSource.advanceTimeBy(50)
+        advanceTimeBy(50)
+        runCurrent()
+        assertEquals(listOf(50L, 100L), executionTimes.sorted())
+        assertEquals(listOf("first-waiter", "second-waiter"), listOf(firstWaiter.await(), secondWaiter.await()).sorted())
+    }
+
+    @Test
     fun `given rate limiter when token refill occurs during concurrent waits then waiting calls proceed`() = runTest {
         // given
         val testTimeSource = TestTimeSource()
@@ -581,24 +625,22 @@ class RateLimiterTest {
         val rateLimiter = DefaultRateLimiter(cfg, timeSource = testTimeSource)
         rateLimiter.execute { "first" }
 
-        // when - multiple concurrent calls waiting for token
-        val jobs = coroutineScope {
-            (1..2).map { i ->
-                async {
-                    rateLimiter.execute { "result-$i" }
-                }
+        // when - multiple concurrent calls wait for the same token
+        val jobs = (1..2).map { i ->
+            async {
+                rateLimiter.execute { "result-$i" }
             }
         }
+        runCurrent()
 
-        // Advance time to allow token refill
-        testTimeSource.advanceTimeBy(50.milliseconds.inWholeMilliseconds)
-        advanceTimeBy(50.milliseconds.inWholeMilliseconds)
-        advanceUntilIdle()
-
-        // then - at least one should succeed (token refilled)
-        val results = jobs.mapNotNull { job ->
-            runCatching { job.await() }.getOrNull()
+        // Advance through the two windows needed to grant both permits.
+        repeat(2) {
+            testTimeSource.advanceTimeBy(50.milliseconds.inWholeMilliseconds)
+            advanceTimeBy(50.milliseconds.inWholeMilliseconds)
+            runCurrent()
         }
-        assertTrue(results.isNotEmpty(), "At least one call should succeed after token refill")
+
+        // then - each waiter receives a permit in a distinct window
+        assertEquals(listOf("result-1", "result-2"), jobs.map { it.await() })
     }
 }
