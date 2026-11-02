@@ -342,6 +342,69 @@ class ResilientBuilder {
         compositionOrder = CompositionOrder(order)
         compositionOrderExplicitlySet = true
     }
+
+    /**
+     * Includes a [ResilienceTemplate] into this builder using lexical overlay semantics.
+     *
+     * - Ordinary configurations are **cloned** from the template and replace any configuration of
+     *   the same policy type declared earlier; blocks declared afterwards (for example
+     *   `retry { maxAttempts = 2 }`) modify the clone property by property and win.
+     * - Named registry policies are re-registered with the usual validation, so including the same
+     *   named policy twice, or mixing named and ordinary variants of one policy, fails.
+     * - If the template declares an explicit [compositionOrder], it replaces the current one;
+     *   the last explicit order wins.
+     * - Nothing is shared with the template or other builds except explicit registry state.
+     */
+    @OptIn(ResilientExperimentalApi::class)
+    fun include(template: ResilienceTemplate) {
+        template.applyTo(this)
+    }
+
+    /** Returns an independent copy of this builder's definitions. */
+    @OptIn(ResilientExperimentalApi::class)
+    internal fun snapshot(): ResilientBuilder = ResilientBuilder().also { it.mergeFrom(this) }
+
+    @OptIn(ResilientExperimentalApi::class)
+    internal fun mergeFrom(source: ResilientBuilder) {
+        source.retryConfig?.let { retryConfig = it.snapshot() }
+        source.circuitBreakerConfig?.let { cfg ->
+            require(circuitBreakerNamedSpec == null) {
+                "Cannot use circuitBreaker { } together with circuitBreakerNamed(...); choose one."
+            }
+            circuitBreakerConfig = cfg.snapshot()
+        }
+        source.circuitBreakerNamedSpec?.let { spec ->
+            circuitBreakerNamed(spec.registry, spec.name, spec.configure)
+        }
+        source.rateLimiterConfig?.let { cfg ->
+            require(rateLimiterNamedSpec == null) {
+                "Cannot use rateLimiter { } together with rateLimiterNamed(...); choose one."
+            }
+            rateLimiterConfig = cfg.snapshot()
+        }
+        source.rateLimiterNamedSpec?.let { spec ->
+            rateLimiterNamed(spec.registry, spec.name, spec.configure)
+        }
+        source.bulkheadConfig?.let { cfg ->
+            require(bulkheadNamedSpec == null) {
+                "Cannot use bulkhead { } together with bulkheadNamed(...); choose one."
+            }
+            bulkheadConfig = cfg.snapshot()
+        }
+        source.bulkheadNamedSpec?.let { spec ->
+            bulkheadNamed(spec.registry, spec.name, spec.configure)
+        }
+        source.timeoutConfig?.let { timeoutConfig = it.snapshot() }
+        source.cacheConfig?.let { cacheConfig = it.snapshot() }
+        source.coalesceConfig?.let { coalesceConfig = it.snapshot() }
+        source.fallbackConfig?.let { fallbackConfig = it.snapshot() }
+        source.hedgingConfig?.let { hedgingConfig = it.snapshot() }
+        source.chaosConfig?.let { chaosConfig = it.snapshot() }
+        if (source.compositionOrderExplicitlySet) {
+            compositionOrder = source.compositionOrder
+            compositionOrderExplicitlySet = true
+        }
+    }
 }
 
 /**
