@@ -127,6 +127,59 @@ val policy = resilient {
 
 ---
 
+## Keyed Rate Limiter
+
+Use `KeyedRateLimiter<C, K>` when a typed execution context chooses one independent token bucket per key, such as a tenant, account, or API credential. It is separate from the `resilient { rateLimiter { } }` DSL so key selection stays explicit at each call site.
+
+```kotlin
+import com.santimattius.resilient.ratelimiter.keyedRateLimiter
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+
+data class Request(val tenantId: String)
+
+val perTenant = keyedRateLimiter<Request, String> {
+    keyProvider = { request -> request.tenantId }
+    maxCalls = 20
+    period = 1.seconds
+    maxBuckets = 10_000
+    bucketIdleTtl = 10.minutes
+}
+
+suspend fun search(request: Request): List<Result> =
+    perTenant.execute(request) { searchApi.query(request) }
+```
+
+Each key has its own `maxCalls`/`period` quota: exhausting one tenant does not affect another tenant. `keyProvider` runs before any bucket or permit is acquired, so a key-extraction error leaves limiter state unchanged. The limiter validates that `keyProvider` is configured, `maxBuckets` and `maxCalls` are at least one, and the period and idle TTL are positive.
+
+### Cardinality and lifecycle
+
+`maxBuckets` bounds resident key buckets. On each execution, inactive buckets past `bucketIdleTtl` are removed. If capacity is still full, the least-recently-used **inactive** bucket is evicted. Buckets with an executing block or a caller waiting for a token are never evicted. If every bucket is active or waiting, the new key is rejected with `KeyedRateLimiterCapacityExceededException`; its message intentionally contains no raw key material. Cancellation propagates to the caller and releases the bucket reservation in `finally`.
+
+### Composing a global quota with a per-key quota
+
+A keyed limiter deliberately enforces only per-key quota. When a downstream also needs a global quota, compose two limiters explicitly:
+
+```kotlin
+import com.santimattius.resilient.ratelimiter.DefaultRateLimiter
+import com.santimattius.resilient.ratelimiter.RateLimiterConfig
+import kotlin.time.Duration.Companion.seconds
+
+val global = DefaultRateLimiter(RateLimiterConfig().apply {
+    maxCalls = 500
+    period = 1.seconds
+})
+
+suspend fun callWithBothLimits(request: Request): List<Result> =
+    global.execute {
+        perTenant.execute(request) { searchApi.query(request) }
+    }
+```
+
+Choose and document the nesting order for your product: the example consumes global quota before per-key quota. The keyed limiter does not emit a key-valued telemetry event, and `onRateLimited` receives no key. Do not log, tag, or export raw tenant/user keys; use an approved bounded or hashed dimension if grouping is required.
+
+---
+
 ## Named / Shared Rate Limiter (RateLimiterRegistry)
 
 By default each `resilient { }` policy owns its own token bucket. When multiple call sites target the same downstream API (e.g. different repositories calling the same `"payments"` endpoint) you want a **single shared quota** so that calls from any caller consume from the same pool.
