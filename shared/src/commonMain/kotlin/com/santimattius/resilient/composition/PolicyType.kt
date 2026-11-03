@@ -20,6 +20,8 @@ internal enum class PolicyType {
     CIRCUIT_BREAKER,
     /** Rate limiter: limits rate. */
     RATE_LIMITER,
+    /** Keyed rate limiter: per-key limits derived from typed input. */
+    KEYED_RATE_LIMITER,
     /** Bulkhead: limits concurrency. */
     BULKHEAD,
     /** Hedging: parallel attempts, first success wins. */

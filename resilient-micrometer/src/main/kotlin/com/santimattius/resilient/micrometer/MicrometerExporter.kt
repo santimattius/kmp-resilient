@@ -52,6 +52,12 @@ fun SharedFlow<ResilientEvent>.exportToMicrometer(
                         .register(registry)
                         .increment()
 
+                is ResilientEvent.KeyedRateLimited ->
+                    Counter.builder("resilient.keyed_rate_limiter.limited")
+                        .description("Number of times execution was limited by the keyed rate limiter")
+                        .register(registry)
+                        .increment()
+
                 is ResilientEvent.BulkheadRejected ->
                     Counter.builder("resilient.bulkhead.rejected")
                         .description("Number of bulkhead rejections")

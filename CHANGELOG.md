@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Typed `KeyedRateLimiter<C, K>` and `keyedRateLimiter<C, K> { ... }` DSL for independent per-key quotas.
   - Bounded bucket cardinality with idle TTL and inactive-only LRU eviction.
   - Active and waiting buckets remain resident; capacity errors and callbacks do not expose raw keys.
+- **Typed keyed and global rate limiting**
+  - `keyedRateLimiter<K> { ... }` and `keyedRateLimiterNamed<K>(registry, name) { ... }` in `resilientFor<Input>`, composable with the global rate limiter in one `execute(input)` call.
+  - `KeyedRateLimiterRegistry`, `KeyedRateLimiter.snapshot()` and `TypedResilientPolicy.getKeyedRateLimiterSnapshot()`; none expose raw inputs or keys.
+  - `OrderablePolicyType.KEYED_RATE_LIMITER` for independent ordering; by default it runs right after `RATE_LIMITER`.
 - **Benchmark module** *(new module: `:benchmark` — not published)*
   - Standalone `:benchmark` module using `kotlinx-benchmark 0.4.17` for reproducible, microsecond-resolution performance measurements.
   - `RetryBenchmark`: measures `RetryPolicy.execute` throughput under immediate success, single transient failure, and full-retry-exhaust scenarios.
@@ -27,6 +31,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Telemetry (source-incompatible for exhaustive `when`)**
+  - New sealed subtype `ResilientEvent.KeyedRateLimited` (keyless). Consumers that exhaustively match `ResilientEvent` must handle it; the OpenTelemetry and Micrometer exporters now count it. Acceptable under the current pre-release line; the next release version must reflect this.
 - **Dependencies**
   - Kotlin `2.4.0`
   - Android Gradle Plugin `9.2.1`
