@@ -23,6 +23,7 @@ A Kotlin Multiplatform library providing resilience patterns (Timeout, Retry, Ci
   - [Fallback](#fallback)
   - [Chaos Policy (Experimental)](#chaos-policy-experimental)
   - [Deadline Propagation (Experimental)](#deadline-propagation-experimental)
+  - [Typed Policies and Templates](#typed-policies-and-templates)
 - [Combined Example](#combined-example)
 - [Ktor HTTP Client Integration](#ktor-http-client-integration)
 - [Telemetry Exporters](#telemetry-exporters)
@@ -455,6 +456,52 @@ Use this to propagate a single end-to-end deadline across multiple policy calls 
 
 ---
 
+### Typed Policies and Templates
+`resilientFor<Input> { }` builds a `TypedResilientPolicy<Input>` whose `execute(input) { ... }` hands an explicit, typed input to the protected block (the same input on every attempt). It uses the same engine, default order, telemetry and cancellation as `resilient { }`; `ResilientScope` stays reserved for coroutine lifecycle.
+
+`resilienceTemplate { }` defines an immutable, context-free set of policies that any `resilient { }` or `resilientFor<Input> { }` build can pull in with `include(template)`, even for unrelated result or input types.
+```kotlin
+import com.santimattius.resilient.composition.OrderablePolicyType
+import com.santimattius.resilient.composition.resilienceTemplate
+import com.santimattius.resilient.composition.resilientFor
+
+val baseline = resilienceTemplate {
+    timeout { timeout = 2.seconds }
+    retry { maxAttempts = 3 }
+}
+
+data class UserId(val value: String)
+data class Request(val tenant: String)
+
+val users = resilientFor<UserId>(scope) {
+    include(baseline)
+    retry { maxAttempts = 2 } // local overlay: only maxAttempts changes
+}
+val name = users.execute(UserId("u-1")) { id -> api.loadName(id) }
+
+val search = resilientFor<Request>(scope) {
+    include(baseline)
+    rateLimiter { maxCalls = 500; period = 1.seconds }       // global quota
+    keyedRateLimiter<String> {                                // per-tenant quota
+        keyProvider = { it.tenant }
+        maxCalls = 20
+        period = 1.seconds
+    }
+}
+val result = search.execute(Request("acme")) { request -> api.search(request) }
+```
+**Semantics**
+- Overlay: `include` clones the template's configuration; a later local block modifies that clone property by property (local wins). The last explicit `compositionOrder` wins.
+- Including two templates that configure the same ordinary policy type: the second **replaces** the first (no merging between templates).
+- State: every build is independent, so two policies built from one template never share caches, buckets, breakers or bulkheads. State is shared only through explicit named registries (`rateLimiterNamed`, `circuitBreakerNamed`, `bulkheadNamed`, `keyedRateLimiterNamed`); closing a policy never destroys registry-owned state.
+- Keyed rate limiting depends on `Input`, so `keyedRateLimiter`/`keyedRateLimiterNamed` live on the typed builder and cannot be part of a template.
+
+**Global + keyed rate limiting:** both apply in one `execute(input)` call. By default the global limiter runs outside the keyed one (a call rejected globally never creates a key bucket); change it with `compositionOrder(listOf(OrderablePolicyType.KEYED_RATE_LIMITER, OrderablePolicyType.RATE_LIMITER))`. Inspect state with `getHealthSnapshot().rateLimiter` and `getKeyedRateLimiterSnapshot()`.
+
+**Privacy:** raw inputs and derived keys never appear in events (`ResilientEvent.KeyedRateLimited` is keyless), snapshots (aggregate counts only) or exception messages.
+
+→ [In-depth documentation](docs/patterns/typed-policies.md)
+
 ## Combined Example
 ```kotlin
 val policy = resilient {
@@ -731,6 +778,7 @@ Theoretical and technical deep-dive documentation for each pattern — definitio
 | Hedging | [docs/patterns/hedging.md](docs/patterns/hedging.md) |
 | Cache | [docs/patterns/cache.md](docs/patterns/cache.md) |
 | Fallback | [docs/patterns/fallback.md](docs/patterns/fallback.md) |
+| Typed Policies and Templates | [docs/patterns/typed-policies.md](docs/patterns/typed-policies.md) |
 
 → [Full index with descriptions](docs/README.md)
 
