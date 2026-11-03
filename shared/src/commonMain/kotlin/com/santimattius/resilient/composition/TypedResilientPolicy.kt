@@ -85,6 +85,8 @@ class TypedResilientPolicy<Input> internal constructor(
 @OptIn(ResilientExperimentalApi::class)
 class TypedResilientBuilder<Input> internal constructor() {
     internal val delegate = ResilientBuilder()
+    internal var cacheKeyFor: ((Input) -> String)? = null
+    internal var coalesceKeyFor: ((Input) -> String)? = null
     internal var keyedRateLimiterFactory: ((suspend () -> Unit) -> KeyedRateLimiter<Input, *>)? = null
 
     /** @see ResilientBuilder.retry */
@@ -170,6 +172,25 @@ class TypedResilientBuilder<Input> internal constructor() {
     /** @see ResilientBuilder.coalesce */
     fun coalesce(config: CoalesceConfig.() -> Unit) = delegate.coalesce(config)
 
+    /**
+     * Derives the cache key from the execution [Input]. Required when a [cache] is configured in a
+     * typed policy (directly or through an included [ResilienceTemplate]): building without it
+     * throws, because the static [CacheConfig.key] would make different inputs share one entry.
+     * The derived key is used only internally; cache events report a redacted key.
+     */
+    fun cacheKeyFor(keyFor: (Input) -> String) {
+        cacheKeyFor = keyFor
+    }
+
+    /**
+     * Derives the coalescing key from the execution [Input]. Required when [coalesce] is configured
+     * in a typed policy (directly or through an included template); concurrent executions with the
+     * same key share one in-flight call, different keys run separately.
+     */
+    fun coalesceKeyFor(keyFor: (Input) -> String) {
+        coalesceKeyFor = keyFor
+    }
+
     /** @see ResilientBuilder.fallback */
     fun fallback(config: FallbackConfig<Any?>) = delegate.fallback(config)
 
@@ -202,10 +223,29 @@ fun <Input> resilientFor(
     block: TypedResilientBuilder<Input>.() -> Unit
 ): TypedResilientPolicy<Input> {
     val builder = TypedResilientBuilder<Input>().apply(block)
+    val delegate = builder.delegate
+    require(delegate.cacheConfig == null || builder.cacheKeyFor != null) {
+        "A typed policy with cache { } must derive the key from its input: call cacheKeyFor { input -> ... } " +
+            "in the resilientFor block. A static key would share one entry across different inputs."
+    }
+    require(delegate.coalesceConfig == null || builder.coalesceKeyFor != null) {
+        "A typed policy with coalesce { } must derive the key from its input: call coalesceKeyFor { input -> ... } " +
+            "in the resilientFor block. A static key would merge in-flight calls of different inputs."
+    }
+    require(builder.cacheKeyFor == null || delegate.cacheConfig != null) {
+        "cacheKeyFor was set but no cache { } is configured."
+    }
+    require(builder.coalesceKeyFor == null || delegate.coalesceConfig != null) {
+        "coalesceKeyFor was set but no coalesce { } is configured."
+    }
+    @Suppress("UNCHECKED_CAST")
+    val cacheKeyFor = builder.cacheKeyFor as ((Any?) -> String)?
+    @Suppress("UNCHECKED_CAST")
+    val coalesceKeyFor = builder.coalesceKeyFor as ((Any?) -> String)?
     @Suppress("UNCHECKED_CAST")
     val keyedFactory = builder.keyedRateLimiterFactory
         as ((suspend () -> Unit) -> KeyedRateLimiter<Any?, *>)?
-    return TypedResilientPolicy(ResilientEngine(builder.delegate, resilientScope, keyedFactory))
+    return TypedResilientPolicy(ResilientEngine(builder.delegate, resilientScope, keyedFactory, cacheKeyFor, coalesceKeyFor))
 }
 
 /**
