@@ -18,6 +18,8 @@ jobs:
           java-version: 21
       - name: Check
         run: ./gradlew :shared:check
+      - name: API compatibility check
+        run: ./gradlew apiCheck
 
   benchmark:
     name: Benchmark Smoke

@@ -1,0 +1,21 @@
+public final class com/santimattius/resilient/ktor/ResilientPluginConfig {
+	public fun <init> ()V
+	public final fun bulkhead (Lkotlin/jvm/functions/Function1;)V
+	public final fun circuitBreaker (Lkotlin/jvm/functions/Function1;)V
+	public final fun getPolicy ()Lcom/santimattius/resilient/ResilientPolicy;
+	public final fun getRetryOnlyIdempotent ()Z
+	public final fun getScope ()Lcom/santimattius/resilient/composition/ResilientScope;
+	public final fun getShouldRetryOnStatus ()Lkotlin/jvm/functions/Function1;
+	public final fun rateLimiter (Lkotlin/jvm/functions/Function1;)V
+	public final fun retry (Lkotlin/jvm/functions/Function1;)V
+	public final fun setPolicy (Lcom/santimattius/resilient/ResilientPolicy;)V
+	public final fun setRetryOnlyIdempotent (Z)V
+	public final fun setScope (Lcom/santimattius/resilient/composition/ResilientScope;)V
+	public final fun setShouldRetryOnStatus (Lkotlin/jvm/functions/Function1;)V
+	public final fun timeout (Lkotlin/jvm/functions/Function1;)V
+}
+
+public final class com/santimattius/resilient/ktor/ResilientPluginKt {
+	public static final fun getResilientPlugin ()Lio/ktor/client/plugins/api/ClientPlugin;
+}
+

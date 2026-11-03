@@ -16,7 +16,7 @@ Add to your test dependencies:
 kotlin {
     sourceSets {
         commonTest.dependencies {
-            implementation("io.github.santimattius.resilient:resilient-test:1.5.0")
+            implementation("io.github.santimattius.resilient:resilient-test:2.1.0")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
         }
     }

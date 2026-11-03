@@ -1,0 +1,715 @@
+public final class com/santimattius/resilient/CacheSnapshot {
+	public fun <init> (ID)V
+	public final fun component1 ()I
+	public final fun component2 ()D
+	public final fun copy (ID)Lcom/santimattius/resilient/CacheSnapshot;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/CacheSnapshot;IDILjava/lang/Object;)Lcom/santimattius/resilient/CacheSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEntryCount ()I
+	public final fun getHitRate ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/PolicyHealthSnapshot {
+	public fun <init> ()V
+	public fun <init> (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;Lcom/santimattius/resilient/RateLimiterSnapshot;Lcom/santimattius/resilient/RetrySnapshot;Lcom/santimattius/resilient/CacheSnapshot;)V
+	public synthetic fun <init> (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;Lcom/santimattius/resilient/RateLimiterSnapshot;Lcom/santimattius/resilient/RetrySnapshot;Lcom/santimattius/resilient/CacheSnapshot;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;
+	public final fun component2 ()Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;
+	public final fun component3 ()Lcom/santimattius/resilient/RateLimiterSnapshot;
+	public final fun component4 ()Lcom/santimattius/resilient/RetrySnapshot;
+	public final fun component5 ()Lcom/santimattius/resilient/CacheSnapshot;
+	public final fun copy (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;Lcom/santimattius/resilient/RateLimiterSnapshot;Lcom/santimattius/resilient/RetrySnapshot;Lcom/santimattius/resilient/CacheSnapshot;)Lcom/santimattius/resilient/PolicyHealthSnapshot;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/PolicyHealthSnapshot;Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;Lcom/santimattius/resilient/RateLimiterSnapshot;Lcom/santimattius/resilient/RetrySnapshot;Lcom/santimattius/resilient/CacheSnapshot;ILjava/lang/Object;)Lcom/santimattius/resilient/PolicyHealthSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBulkhead ()Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;
+	public final fun getCache ()Lcom/santimattius/resilient/CacheSnapshot;
+	public final fun getCircuitBreaker ()Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;
+	public final fun getRateLimiter ()Lcom/santimattius/resilient/RateLimiterSnapshot;
+	public final fun getRetry ()Lcom/santimattius/resilient/RetrySnapshot;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/RateLimiterSnapshot {
+	public synthetic fun <init> (IJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2-UwyO8pc ()J
+	public final fun copy-HG0u8IE (IJ)Lcom/santimattius/resilient/RateLimiterSnapshot;
+	public static synthetic fun copy-HG0u8IE$default (Lcom/santimattius/resilient/RateLimiterSnapshot;IJILjava/lang/Object;)Lcom/santimattius/resilient/RateLimiterSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRemainingCalls ()I
+	public final fun getTimeToRefill-UwyO8pc ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/santimattius/resilient/ResilientPolicy : java/lang/AutoCloseable {
+	public abstract fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getCacheHandle ()Lcom/santimattius/resilient/cache/CacheHandle;
+	public abstract fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
+	public fun getHealthSnapshot ()Lcom/santimattius/resilient/PolicyHealthSnapshot;
+}
+
+public final class com/santimattius/resilient/ResilientPolicy$DefaultImpls {
+	public static fun getCacheHandle (Lcom/santimattius/resilient/ResilientPolicy;)Lcom/santimattius/resilient/cache/CacheHandle;
+	public static fun getHealthSnapshot (Lcom/santimattius/resilient/ResilientPolicy;)Lcom/santimattius/resilient/PolicyHealthSnapshot;
+}
+
+public final class com/santimattius/resilient/RetrySnapshot {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lcom/santimattius/resilient/RetrySnapshot;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/RetrySnapshot;IILjava/lang/Object;)Lcom/santimattius/resilient/RetrySnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxAttempts ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface annotation class com/santimattius/resilient/annotations/ResilientExperimentalApi : java/lang/annotation/Annotation {
+}
+
+public abstract interface class com/santimattius/resilient/bulkhead/Bulkhead {
+	public abstract fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun snapshot ()Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;
+}
+
+public final class com/santimattius/resilient/bulkhead/Bulkhead$DefaultImpls {
+	public static fun snapshot (Lcom/santimattius/resilient/bulkhead/Bulkhead;)Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;
+}
+
+public final class com/santimattius/resilient/bulkhead/BulkheadConfig {
+	public fun <init> ()V
+	public final fun getMaxConcurrentCalls ()I
+	public final fun getMaxWaitingCalls ()I
+	public final fun getTimeout-FghU774 ()Lkotlin/time/Duration;
+	public final fun setMaxConcurrentCalls (I)V
+	public final fun setMaxWaitingCalls (I)V
+	public final fun setTimeout-BwNAW2A (Lkotlin/time/Duration;)V
+}
+
+public final class com/santimattius/resilient/bulkhead/BulkheadFullException : java/lang/Exception {
+	public fun <init> ()V
+}
+
+public final class com/santimattius/resilient/bulkhead/BulkheadRegistry {
+	public fun <init> ()V
+	public final fun getOrCreate (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lcom/santimattius/resilient/bulkhead/DefaultBulkhead;
+	public static synthetic fun getOrCreate$default (Lcom/santimattius/resilient/bulkhead/BulkheadRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/santimattius/resilient/bulkhead/DefaultBulkhead;
+}
+
+public final class com/santimattius/resilient/bulkhead/BulkheadSnapshot {
+	public fun <init> (IIII)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun copy (IIII)Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;IIIIILjava/lang/Object;)Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActiveConcurrentCalls ()I
+	public final fun getMaxConcurrentCalls ()I
+	public final fun getMaxWaitingCalls ()I
+	public final fun getWaitingCalls ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/bulkhead/DefaultBulkhead : com/santimattius/resilient/bulkhead/Bulkhead {
+	public fun <init> (Lcom/santimattius/resilient/bulkhead/BulkheadConfig;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/santimattius/resilient/bulkhead/BulkheadConfig;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun snapshot ()Lcom/santimattius/resilient/bulkhead/BulkheadSnapshot;
+}
+
+public final class com/santimattius/resilient/cache/CacheConfig {
+	public fun <init> ()V
+	public final fun getCleanupBatch ()I
+	public final fun getCleanupInterval-FghU774 ()Lkotlin/time/Duration;
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getKeyProvider ()Lkotlin/jvm/functions/Function1;
+	public final fun getTtl-UwyO8pc ()J
+	public final fun setCleanupBatch (I)V
+	public final fun setCleanupInterval-BwNAW2A (Lkotlin/time/Duration;)V
+	public final fun setKey (Ljava/lang/String;)V
+	public final fun setKeyProvider (Lkotlin/jvm/functions/Function1;)V
+	public final fun setTtl-LRDsOJo (J)V
+}
+
+public abstract interface class com/santimattius/resilient/cache/CacheHandle {
+	public abstract fun invalidate (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun invalidatePrefix (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/santimattius/resilient/cache/CachePolicy {
+	public abstract fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/chaos/ChaosConfig {
+	public fun <init> ()V
+	public final fun getEnabled ()Z
+	public final fun getException ()Lkotlin/jvm/functions/Function0;
+	public final fun getFailureRate ()D
+	public final fun getInjectResult ()Lkotlin/jvm/functions/Function0;
+	public final fun getLatency-FghU774 ()Lkotlin/time/Duration;
+	public final fun setEnabled (Z)V
+	public final fun setException (Lkotlin/jvm/functions/Function0;)V
+	public final fun setFailureRate (D)V
+	public final fun setInjectResult (Lkotlin/jvm/functions/Function0;)V
+	public final fun setLatency-BwNAW2A (Lkotlin/time/Duration;)V
+}
+
+public final class com/santimattius/resilient/chaos/DefaultChaosPolicy {
+	public fun <init> (Lcom/santimattius/resilient/chaos/ChaosConfig;)V
+	public final fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/santimattius/resilient/circuitbreaker/CircuitBreaker {
+	public abstract fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun snapshot ()Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;
+}
+
+public final class com/santimattius/resilient/circuitbreaker/CircuitBreakerConfig {
+	public fun <init> ()V
+	public final fun getFailureRateThreshold ()Ljava/lang/Double;
+	public final fun getFailureThreshold ()I
+	public final fun getHalfOpenMaxCalls ()I
+	public final fun getMinimumNumberOfCalls ()I
+	public final fun getOnStateChange ()Lkotlin/jvm/functions/Function1;
+	public final fun getShouldRecordFailure ()Lkotlin/jvm/functions/Function1;
+	public final fun getShouldRecordResult ()Lkotlin/jvm/functions/Function1;
+	public final fun getSlidingWindow-FghU774 ()Lkotlin/time/Duration;
+	public final fun getSuccessThreshold ()I
+	public final fun getTimeout-UwyO8pc ()J
+	public final fun setFailureRateThreshold (Ljava/lang/Double;)V
+	public final fun setFailureThreshold (I)V
+	public final fun setHalfOpenMaxCalls (I)V
+	public final fun setMinimumNumberOfCalls (I)V
+	public final fun setOnStateChange (Lkotlin/jvm/functions/Function1;)V
+	public final fun setShouldRecordFailure (Lkotlin/jvm/functions/Function1;)V
+	public final fun setShouldRecordResult (Lkotlin/jvm/functions/Function1;)V
+	public final fun setSlidingWindow-BwNAW2A (Lkotlin/time/Duration;)V
+	public final fun setSuccessThreshold (I)V
+	public final fun setTimeout-LRDsOJo (J)V
+}
+
+public final class com/santimattius/resilient/circuitbreaker/CircuitBreakerOpenException : java/lang/Exception {
+	public synthetic fun <init> (Lcom/santimattius/resilient/circuitbreaker/CircuitState;Lkotlin/time/Duration;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCurrentState ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public final fun getRetryAfter-FghU774 ()Lkotlin/time/Duration;
+}
+
+public final class com/santimattius/resilient/circuitbreaker/CircuitBreakerRegistry {
+	public fun <init> ()V
+	public final fun getOrCreate (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)Lcom/santimattius/resilient/circuitbreaker/DefaultCircuitBreaker;
+	public static synthetic fun getOrCreate$default (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/santimattius/resilient/circuitbreaker/DefaultCircuitBreaker;
+}
+
+public final class com/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot {
+	public fun <init> (Lcom/santimattius/resilient/circuitbreaker/CircuitState;II)V
+	public final fun component1 ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun copy (Lcom/santimattius/resilient/circuitbreaker/CircuitState;II)Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;Lcom/santimattius/resilient/circuitbreaker/CircuitState;IIILjava/lang/Object;)Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFailureCount ()I
+	public final fun getState ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public final fun getSuccessCount ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/circuitbreaker/CircuitState : java/lang/Enum {
+	public static final field CLOSED Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public static final field HALF_OPEN Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public static final field OPEN Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public static fun values ()[Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+}
+
+public final class com/santimattius/resilient/circuitbreaker/DefaultCircuitBreaker : com/santimattius/resilient/circuitbreaker/CircuitBreaker {
+	public fun <init> (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerConfig;Lcom/santimattius/resilient/circuitbreaker/TimeSource;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerConfig;Lcom/santimattius/resilient/circuitbreaker/TimeSource;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun snapshot ()Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;
+}
+
+public final class com/santimattius/resilient/circuitbreaker/SystemTimeSource : com/santimattius/resilient/circuitbreaker/TimeSource {
+	public static final field INSTANCE Lcom/santimattius/resilient/circuitbreaker/SystemTimeSource;
+	public fun currentTimeMillis ()J
+}
+
+public abstract interface class com/santimattius/resilient/circuitbreaker/TimeSource {
+	public abstract fun currentTimeMillis ()J
+}
+
+public final class com/santimattius/resilient/coalescing/CoalesceConfig {
+	public fun <init> ()V
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getKeyProvider ()Lkotlin/jvm/functions/Function1;
+	public final fun setKey (Ljava/lang/String;)V
+	public final fun setKeyProvider (Lkotlin/jvm/functions/Function1;)V
+}
+
+public abstract interface class com/santimattius/resilient/coalescing/CoalescingPolicy {
+	public abstract fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/coalescing/DefaultCoalescingPolicy : com/santimattius/resilient/coalescing/CoalescingPolicy {
+	public fun <init> (Lcom/santimattius/resilient/coalescing/CoalesceConfig;Lcom/santimattius/resilient/composition/ResilientScope;)V
+	public fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/composition/OrderablePolicyType : java/lang/Enum {
+	public static final field BULKHEAD Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static final field CACHE Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static final field CHAOS Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static final field CIRCUIT_BREAKER Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static final field COALESCE Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static final field HEDGING Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static final field KEYED_RATE_LIMITER Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static final field RATE_LIMITER Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static final field RETRY Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static final field TIMEOUT Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/santimattius/resilient/composition/OrderablePolicyType;
+	public static fun values ()[Lcom/santimattius/resilient/composition/OrderablePolicyType;
+}
+
+public final class com/santimattius/resilient/composition/ResilienceTemplate {
+}
+
+public final class com/santimattius/resilient/composition/ResilienceTemplateKt {
+	public static final fun resilienceTemplate (Lkotlin/jvm/functions/Function1;)Lcom/santimattius/resilient/composition/ResilienceTemplate;
+}
+
+public final class com/santimattius/resilient/composition/ResilientBuilder {
+	public fun <init> ()V
+	public final fun bulkhead (Lkotlin/jvm/functions/Function1;)V
+	public final fun bulkheadNamed (Lcom/santimattius/resilient/bulkhead/BulkheadRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public final fun cache (Lkotlin/jvm/functions/Function1;)V
+	public final fun chaos (Lkotlin/jvm/functions/Function1;)V
+	public final fun circuitBreaker (Lkotlin/jvm/functions/Function1;)V
+	public final fun circuitBreakerNamed (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public final fun coalesce (Lkotlin/jvm/functions/Function1;)V
+	public final fun compositionOrder (Ljava/util/List;)V
+	public final fun fallback (Lcom/santimattius/resilient/fallback/FallbackConfig;)V
+	public final fun hedging (Lkotlin/jvm/functions/Function1;)V
+	public final fun include (Lcom/santimattius/resilient/composition/ResilienceTemplate;)V
+	public final fun rateLimiter (Lkotlin/jvm/functions/Function1;)V
+	public final fun rateLimiterNamed (Lcom/santimattius/resilient/ratelimiter/RateLimiterRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public final fun retry (Lkotlin/jvm/functions/Function1;)V
+	public final fun timeout (Lkotlin/jvm/functions/Function1;)V
+}
+
+public final class com/santimattius/resilient/composition/ResilientBuilderKt {
+	public static final fun resilient (Lcom/santimattius/resilient/composition/ResilientScope;Lkotlin/jvm/functions/Function1;)Lcom/santimattius/resilient/ResilientPolicy;
+}
+
+public final class com/santimattius/resilient/composition/ResilientScope : java/lang/AutoCloseable {
+	public fun <init> ()V
+	public fun <init> (Lkotlinx/coroutines/CoroutineDispatcher;)V
+	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineDispatcher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun async (Lkotlin/coroutines/CoroutineContext;Lkotlinx/coroutines/CoroutineStart;Lkotlin/jvm/functions/Function2;)Lkotlinx/coroutines/Deferred;
+	public static synthetic fun async$default (Lcom/santimattius/resilient/composition/ResilientScope;Lkotlin/coroutines/CoroutineContext;Lkotlinx/coroutines/CoroutineStart;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lkotlinx/coroutines/Deferred;
+	public fun close ()V
+	public final fun launch (Lkotlin/coroutines/CoroutineContext;Lkotlinx/coroutines/CoroutineStart;Lkotlin/jvm/functions/Function2;)Lkotlinx/coroutines/Job;
+	public static synthetic fun launch$default (Lcom/santimattius/resilient/composition/ResilientScope;Lkotlin/coroutines/CoroutineContext;Lkotlinx/coroutines/CoroutineStart;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lkotlinx/coroutines/Job;
+}
+
+public final class com/santimattius/resilient/composition/ResilientScopeExtensionsKt {
+	public static final fun asResilientScope (Lkotlinx/coroutines/CoroutineScope;)Lcom/santimattius/resilient/composition/ResilientScope;
+	public static final fun resilient (Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function1;)Lcom/santimattius/resilient/ResilientPolicy;
+}
+
+public final class com/santimattius/resilient/composition/TypedResilientBuilder {
+	public final fun bulkhead (Lkotlin/jvm/functions/Function1;)V
+	public final fun bulkheadNamed (Lcom/santimattius/resilient/bulkhead/BulkheadRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public final fun cache (Lkotlin/jvm/functions/Function1;)V
+	public final fun chaos (Lkotlin/jvm/functions/Function1;)V
+	public final fun circuitBreaker (Lkotlin/jvm/functions/Function1;)V
+	public final fun circuitBreakerNamed (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public final fun coalesce (Lkotlin/jvm/functions/Function1;)V
+	public final fun compositionOrder (Ljava/util/List;)V
+	public final fun fallback (Lcom/santimattius/resilient/fallback/FallbackConfig;)V
+	public final fun hedging (Lkotlin/jvm/functions/Function1;)V
+	public final fun include (Lcom/santimattius/resilient/composition/ResilienceTemplate;)V
+	public final fun keyedRateLimiter (Lkotlin/jvm/functions/Function1;)V
+	public final fun keyedRateLimiterNamed (Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiterRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public final fun rateLimiter (Lkotlin/jvm/functions/Function1;)V
+	public final fun rateLimiterNamed (Lcom/santimattius/resilient/ratelimiter/RateLimiterRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public final fun retry (Lkotlin/jvm/functions/Function1;)V
+	public final fun timeout (Lkotlin/jvm/functions/Function1;)V
+}
+
+public final class com/santimattius/resilient/composition/TypedResilientPolicy : java/lang/AutoCloseable {
+	public fun close ()V
+	public final fun execute (Ljava/lang/Object;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getCacheHandle ()Lcom/santimattius/resilient/cache/CacheHandle;
+	public final fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
+	public final fun getHealthSnapshot ()Lcom/santimattius/resilient/PolicyHealthSnapshot;
+	public final fun getKeyedRateLimiterSnapshot ()Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiterSnapshot;
+}
+
+public final class com/santimattius/resilient/composition/TypedResilientPolicyKt {
+	public static final fun resilientFor (Lcom/santimattius/resilient/composition/ResilientScope;Lkotlin/jvm/functions/Function1;)Lcom/santimattius/resilient/composition/TypedResilientPolicy;
+	public static final fun resilientFor (Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function1;)Lcom/santimattius/resilient/composition/TypedResilientPolicy;
+}
+
+public final class com/santimattius/resilient/deadline/ResilientDeadline : kotlin/coroutines/AbstractCoroutineContextElement {
+	public static final field Key Lcom/santimattius/resilient/deadline/ResilientDeadline$Key;
+	public fun <init> (Lkotlin/time/TimeMark;)V
+	public final fun getDeadline ()Lkotlin/time/TimeMark;
+	public final fun remaining-UwyO8pc ()J
+}
+
+public final class com/santimattius/resilient/deadline/ResilientDeadline$Key : kotlin/coroutines/CoroutineContext$Key {
+	public final fun after-LRDsOJo (J)Lcom/santimattius/resilient/deadline/ResilientDeadline;
+}
+
+public final class com/santimattius/resilient/fallback/FallbackConfig {
+	public fun <init> (Lkotlin/jvm/functions/Function2;)V
+	public final fun getOnFallback ()Lkotlin/jvm/functions/Function2;
+	public final fun setOnFallback (Lkotlin/jvm/functions/Function2;)V
+}
+
+public final class com/santimattius/resilient/fallback/FallbackPolicy {
+	public fun <init> (Lcom/santimattius/resilient/fallback/FallbackConfig;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/santimattius/resilient/fallback/FallbackConfig;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/hedging/DefaultHedgingPolicy : com/santimattius/resilient/hedging/HedgingPolicy {
+	public fun <init> (Lcom/santimattius/resilient/hedging/HedgingConfig;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/santimattius/resilient/hedging/HedgingConfig;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/hedging/HedgingConfig {
+	public fun <init> ()V
+	public final fun getAttempts ()I
+	public final fun getStagger-UwyO8pc ()J
+	public final fun setAttempts (I)V
+	public final fun setStagger-LRDsOJo (J)V
+}
+
+public abstract interface class com/santimattius/resilient/hedging/HedgingPolicy {
+	public abstract fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/ratelimiter/DefaultRateLimiter : com/santimattius/resilient/ratelimiter/RateLimiter {
+	public fun <init> (Lcom/santimattius/resilient/ratelimiter/RateLimiterConfig;Lkotlin/jvm/functions/Function2;Lcom/santimattius/resilient/circuitbreaker/TimeSource;)V
+	public synthetic fun <init> (Lcom/santimattius/resilient/ratelimiter/RateLimiterConfig;Lkotlin/jvm/functions/Function2;Lcom/santimattius/resilient/circuitbreaker/TimeSource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun snapshot ()Lcom/santimattius/resilient/RateLimiterSnapshot;
+}
+
+public final class com/santimattius/resilient/ratelimiter/KeyedRateLimiter {
+	public fun <init> (Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiterConfig;)V
+	public final fun execute (Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun snapshot ()Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiterSnapshot;
+}
+
+public final class com/santimattius/resilient/ratelimiter/KeyedRateLimiterCapacityExceededException : java/lang/Exception {
+	public fun <init> ()V
+}
+
+public final class com/santimattius/resilient/ratelimiter/KeyedRateLimiterConfig {
+	public field keyProvider Lkotlin/jvm/functions/Function1;
+	public fun <init> ()V
+	public final fun getBucketIdleTtl-UwyO8pc ()J
+	public final fun getKeyProvider ()Lkotlin/jvm/functions/Function1;
+	public final fun getMaxBuckets ()I
+	public final fun getMaxCalls ()I
+	public final fun getOnRateLimited ()Lkotlin/jvm/functions/Function1;
+	public final fun getPeriod-UwyO8pc ()J
+	public final fun getTimeSource ()Lcom/santimattius/resilient/circuitbreaker/TimeSource;
+	public final fun getTimeoutWhenLimited-FghU774 ()Lkotlin/time/Duration;
+	public final fun setBucketIdleTtl-LRDsOJo (J)V
+	public final fun setKeyProvider (Lkotlin/jvm/functions/Function1;)V
+	public final fun setMaxBuckets (I)V
+	public final fun setMaxCalls (I)V
+	public final fun setOnRateLimited (Lkotlin/jvm/functions/Function1;)V
+	public final fun setPeriod-LRDsOJo (J)V
+	public final fun setTimeSource (Lcom/santimattius/resilient/circuitbreaker/TimeSource;)V
+	public final fun setTimeoutWhenLimited-BwNAW2A (Lkotlin/time/Duration;)V
+}
+
+public final class com/santimattius/resilient/ratelimiter/KeyedRateLimiterKt {
+	public static final fun keyedRateLimiter (Lkotlin/jvm/functions/Function1;)Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiter;
+}
+
+public final class com/santimattius/resilient/ratelimiter/KeyedRateLimiterRegistry {
+	public fun <init> ()V
+	public final fun getOrCreate (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiter;
+	public static synthetic fun getOrCreate$default (Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiterRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiter;
+}
+
+public final class com/santimattius/resilient/ratelimiter/KeyedRateLimiterSnapshot {
+	public fun <init> (II)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiterSnapshot;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiterSnapshot;IIILjava/lang/Object;)Lcom/santimattius/resilient/ratelimiter/KeyedRateLimiterSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxBuckets ()I
+	public final fun getResidentBuckets ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/ratelimiter/RateLimitExceededException : java/lang/Exception {
+	public synthetic fun <init> (Lkotlin/time/Duration;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getRetryAfter-FghU774 ()Lkotlin/time/Duration;
+}
+
+public abstract interface class com/santimattius/resilient/ratelimiter/RateLimiter {
+	public abstract fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/ratelimiter/RateLimiterConfig {
+	public fun <init> ()V
+	public final fun getMaxCalls ()I
+	public final fun getOnRateLimited ()Lkotlin/jvm/functions/Function1;
+	public final fun getPeriod-UwyO8pc ()J
+	public final fun getTimeoutWhenLimited-FghU774 ()Lkotlin/time/Duration;
+	public final fun setMaxCalls (I)V
+	public final fun setOnRateLimited (Lkotlin/jvm/functions/Function1;)V
+	public final fun setPeriod-LRDsOJo (J)V
+	public final fun setTimeoutWhenLimited-BwNAW2A (Lkotlin/time/Duration;)V
+}
+
+public final class com/santimattius/resilient/ratelimiter/RateLimiterRegistry {
+	public fun <init> ()V
+	public final fun getOrCreate (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)Lcom/santimattius/resilient/ratelimiter/DefaultRateLimiter;
+	public static synthetic fun getOrCreate$default (Lcom/santimattius/resilient/ratelimiter/RateLimiterRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/santimattius/resilient/ratelimiter/DefaultRateLimiter;
+}
+
+public abstract interface class com/santimattius/resilient/retry/BackoffStrategy {
+	public abstract fun delay (ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/retry/DecorrelatedJitterBackoff : com/santimattius/resilient/retry/BackoffStrategy {
+	public synthetic fun <init> (JJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun delay (ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getBase-UwyO8pc ()J
+	public final fun getCap-UwyO8pc ()J
+}
+
+public final class com/santimattius/resilient/retry/DefaultRetryPolicy : com/santimattius/resilient/retry/RetryPolicy {
+	public fun <init> (Lcom/santimattius/resilient/retry/RetryPolicyConfig;)V
+	public fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun snapshot ()Lcom/santimattius/resilient/RetrySnapshot;
+}
+
+public final class com/santimattius/resilient/retry/ExponentialBackoff : com/santimattius/resilient/retry/BackoffStrategy {
+	public synthetic fun <init> (JJDZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JJDZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun delay (ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getFactor ()D
+	public final fun getInitialDelay-UwyO8pc ()J
+	public final fun getJitter ()Z
+	public final fun getMaxDelay-UwyO8pc ()J
+}
+
+public final class com/santimattius/resilient/retry/FixedBackoff : com/santimattius/resilient/retry/BackoffStrategy {
+	public synthetic fun <init> (JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun delay (ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getDelay-UwyO8pc ()J
+}
+
+public final class com/santimattius/resilient/retry/LinearBackoff : com/santimattius/resilient/retry/BackoffStrategy {
+	public synthetic fun <init> (JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun delay (ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getDelay-UwyO8pc ()J
+}
+
+public abstract interface class com/santimattius/resilient/retry/RetryPolicy {
+	public abstract fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/retry/RetryPolicyConfig {
+	public fun <init> ()V
+	public final fun getBackoffStrategy ()Lcom/santimattius/resilient/retry/BackoffStrategy;
+	public final fun getMaxAttempts ()I
+	public final fun getOnRetry ()Lkotlin/jvm/functions/Function3;
+	public final fun getPerAttemptTimeout-FghU774 ()Lkotlin/time/Duration;
+	public final fun getShouldRetry ()Lkotlin/jvm/functions/Function1;
+	public final fun getShouldRetryResult ()Lkotlin/jvm/functions/Function1;
+	public final fun setBackoffStrategy (Lcom/santimattius/resilient/retry/BackoffStrategy;)V
+	public final fun setMaxAttempts (I)V
+	public final fun setOnRetry (Lkotlin/jvm/functions/Function3;)V
+	public final fun setPerAttemptTimeout-BwNAW2A (Lkotlin/time/Duration;)V
+	public final fun setShouldRetry (Lkotlin/jvm/functions/Function1;)V
+	public final fun setShouldRetryResult (Lkotlin/jvm/functions/Function1;)V
+}
+
+public final class com/santimattius/resilient/retry/RetryableResultException : java/lang/Exception {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Object;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Object;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getLastValue ()Ljava/lang/Object;
+}
+
+public abstract interface class com/santimattius/resilient/telemetry/ResilientEvent {
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$BulkheadRejected : com/santimattius/resilient/telemetry/ResilientEvent {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/santimattius/resilient/telemetry/ResilientEvent$BulkheadRejected;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$BulkheadRejected;Ljava/lang/String;ILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$BulkheadRejected;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$CacheHit : com/santimattius/resilient/telemetry/ResilientEvent {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/santimattius/resilient/telemetry/ResilientEvent$CacheHit;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$CacheHit;Ljava/lang/String;ILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$CacheHit;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$CacheMiss : com/santimattius/resilient/telemetry/ResilientEvent {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/santimattius/resilient/telemetry/ResilientEvent$CacheMiss;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$CacheMiss;Ljava/lang/String;ILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$CacheMiss;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$CircuitStateChanged : com/santimattius/resilient/telemetry/ResilientEvent {
+	public fun <init> (Lcom/santimattius/resilient/circuitbreaker/CircuitState;Lcom/santimattius/resilient/circuitbreaker/CircuitState;)V
+	public final fun component1 ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public final fun component2 ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public final fun copy (Lcom/santimattius/resilient/circuitbreaker/CircuitState;Lcom/santimattius/resilient/circuitbreaker/CircuitState;)Lcom/santimattius/resilient/telemetry/ResilientEvent$CircuitStateChanged;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$CircuitStateChanged;Lcom/santimattius/resilient/circuitbreaker/CircuitState;Lcom/santimattius/resilient/circuitbreaker/CircuitState;ILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$CircuitStateChanged;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFrom ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public final fun getTo ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$FallbackTriggered : com/santimattius/resilient/telemetry/ResilientEvent {
+	public fun <init> (Ljava/lang/Throwable;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/Throwable;)Lcom/santimattius/resilient/telemetry/ResilientEvent$FallbackTriggered;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$FallbackTriggered;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$FallbackTriggered;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$HedgingUsed : com/santimattius/resilient/telemetry/ResilientEvent {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lcom/santimattius/resilient/telemetry/ResilientEvent$HedgingUsed;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$HedgingUsed;IILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$HedgingUsed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAttemptIndex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$KeyedRateLimited : com/santimattius/resilient/telemetry/ResilientEvent {
+	public static final field INSTANCE Lcom/santimattius/resilient/telemetry/ResilientEvent$KeyedRateLimited;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$OperationFailure : com/santimattius/resilient/telemetry/ResilientEvent {
+	public synthetic fun <init> (Ljava/lang/Throwable;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun component2-UwyO8pc ()J
+	public final fun copy-HG0u8IE (Ljava/lang/Throwable;J)Lcom/santimattius/resilient/telemetry/ResilientEvent$OperationFailure;
+	public static synthetic fun copy-HG0u8IE$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$OperationFailure;Ljava/lang/Throwable;JILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$OperationFailure;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDuration-UwyO8pc ()J
+	public final fun getError ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$OperationSuccess : com/santimattius/resilient/telemetry/ResilientEvent {
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-UwyO8pc ()J
+	public final fun copy-LRDsOJo (J)Lcom/santimattius/resilient/telemetry/ResilientEvent$OperationSuccess;
+	public static synthetic fun copy-LRDsOJo$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$OperationSuccess;JILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$OperationSuccess;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDuration-UwyO8pc ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$RateLimited : com/santimattius/resilient/telemetry/ResilientEvent {
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-UwyO8pc ()J
+	public final fun copy-LRDsOJo (J)Lcom/santimattius/resilient/telemetry/ResilientEvent$RateLimited;
+	public static synthetic fun copy-LRDsOJo$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$RateLimited;JILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$RateLimited;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getWaitTime-UwyO8pc ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$RetryAttempt : com/santimattius/resilient/telemetry/ResilientEvent {
+	public fun <init> (ILjava/lang/Throwable;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun copy (ILjava/lang/Throwable;)Lcom/santimattius/resilient/telemetry/ResilientEvent$RetryAttempt;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$RetryAttempt;ILjava/lang/Throwable;ILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$RetryAttempt;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAttempt ()I
+	public final fun getError ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/telemetry/ResilientEvent$TimeoutTriggered : com/santimattius/resilient/telemetry/ResilientEvent {
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-UwyO8pc ()J
+	public final fun copy-LRDsOJo (J)Lcom/santimattius/resilient/telemetry/ResilientEvent$TimeoutTriggered;
+	public static synthetic fun copy-LRDsOJo$default (Lcom/santimattius/resilient/telemetry/ResilientEvent$TimeoutTriggered;JILjava/lang/Object;)Lcom/santimattius/resilient/telemetry/ResilientEvent$TimeoutTriggered;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTimeout-UwyO8pc ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/santimattius/resilient/timeout/DefaultTimeoutPolicy : com/santimattius/resilient/timeout/TimeoutPolicy {
+	public fun <init> (Lcom/santimattius/resilient/timeout/TimeoutConfig;)V
+	public fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/timeout/TimeoutConfig {
+	public fun <init> ()V
+	public final fun getOnTimeout ()Lkotlin/jvm/functions/Function1;
+	public final fun getTimeout-UwyO8pc ()J
+	public final fun setOnTimeout (Lkotlin/jvm/functions/Function1;)V
+	public final fun setTimeout-LRDsOJo (J)V
+}
+
+public abstract interface class com/santimattius/resilient/timeout/TimeoutPolicy {
+	public abstract fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+

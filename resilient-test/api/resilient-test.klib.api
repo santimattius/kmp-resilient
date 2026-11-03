@@ -1,0 +1,42 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, iosX64, js, macosArm64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.santimattius.resilient:resilient-test>
+final class com.santimattius.resilient.test/FaultInjectedException : kotlin/Exception { // com.santimattius.resilient.test/FaultInjectedException|null[0]
+    constructor <init>(kotlin/String = ...) // com.santimattius.resilient.test/FaultInjectedException.<init>|<init>(kotlin.String){}[0]
+}
+
+final class com.santimattius.resilient.test/FaultInjector { // com.santimattius.resilient.test/FaultInjector|null[0]
+    constructor <init>(kotlin/Double = ..., kotlin/Function0<kotlin/Throwable> = ..., kotlin.time/Duration = ..., kotlin/Boolean = ..., kotlin/Int = ...) // com.santimattius.resilient.test/FaultInjector.<init>|<init>(kotlin.Double;kotlin.Function0<kotlin.Throwable>;kotlin.time.Duration;kotlin.Boolean;kotlin.Int){}[0]
+
+    final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.test/FaultInjector.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+
+    final class Builder { // com.santimattius.resilient.test/FaultInjector.Builder|null[0]
+        constructor <init>() // com.santimattius.resilient.test/FaultInjector.Builder.<init>|<init>(){}[0]
+
+        final fun build(): com.santimattius.resilient.test/FaultInjector // com.santimattius.resilient.test/FaultInjector.Builder.build|build(){}[0]
+        final fun delay(kotlin.time/Duration): com.santimattius.resilient.test/FaultInjector.Builder // com.santimattius.resilient.test/FaultInjector.Builder.delay|delay(kotlin.time.Duration){}[0]
+        final fun delayJitter(kotlin/Boolean): com.santimattius.resilient.test/FaultInjector.Builder // com.santimattius.resilient.test/FaultInjector.Builder.delayJitter|delayJitter(kotlin.Boolean){}[0]
+        final fun exception(kotlin/Function0<kotlin/Throwable>): com.santimattius.resilient.test/FaultInjector.Builder // com.santimattius.resilient.test/FaultInjector.Builder.exception|exception(kotlin.Function0<kotlin.Throwable>){}[0]
+        final fun failCount(kotlin/Int): com.santimattius.resilient.test/FaultInjector.Builder // com.santimattius.resilient.test/FaultInjector.Builder.failCount|failCount(kotlin.Int){}[0]
+        final fun failureRate(kotlin/Double): com.santimattius.resilient.test/FaultInjector.Builder // com.santimattius.resilient.test/FaultInjector.Builder.failureRate|failureRate(kotlin.Double){}[0]
+    }
+
+    final object Companion { // com.santimattius.resilient.test/FaultInjector.Companion|null[0]
+        final fun builder(): com.santimattius.resilient.test/FaultInjector.Builder // com.santimattius.resilient.test/FaultInjector.Companion.builder|builder(){}[0]
+    }
+}
+
+final object com.santimattius.resilient.test/PolicyBuilders { // com.santimattius.resilient.test/PolicyBuilders|null[0]
+    final fun bulkheadPolicy(com.santimattius.resilient.composition/ResilientScope, kotlin/Int = ..., kotlin/Int = ...): com.santimattius.resilient/ResilientPolicy // com.santimattius.resilient.test/PolicyBuilders.bulkheadPolicy|bulkheadPolicy(com.santimattius.resilient.composition.ResilientScope;kotlin.Int;kotlin.Int){}[0]
+    final fun circuitBreakerPolicy(com.santimattius.resilient.composition/ResilientScope, kotlin/Int = ..., kotlin/Int = ..., kotlin.time/Duration = ...): com.santimattius.resilient/ResilientPolicy // com.santimattius.resilient.test/PolicyBuilders.circuitBreakerPolicy|circuitBreakerPolicy(com.santimattius.resilient.composition.ResilientScope;kotlin.Int;kotlin.Int;kotlin.time.Duration){}[0]
+    final fun rateLimiterPolicy(com.santimattius.resilient.composition/ResilientScope, kotlin/Int = ..., kotlin.time/Duration = ...): com.santimattius.resilient/ResilientPolicy // com.santimattius.resilient.test/PolicyBuilders.rateLimiterPolicy|rateLimiterPolicy(com.santimattius.resilient.composition.ResilientScope;kotlin.Int;kotlin.time.Duration){}[0]
+    final fun retryPolicy(com.santimattius.resilient.composition/ResilientScope, kotlin/Int = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin/Function1<kotlin/Throwable, kotlin/Boolean> = ...): com.santimattius.resilient/ResilientPolicy // com.santimattius.resilient.test/PolicyBuilders.retryPolicy|retryPolicy(com.santimattius.resilient.composition.ResilientScope;kotlin.Int;kotlin.time.Duration;kotlin.time.Duration;kotlin.Function1<kotlin.Throwable,kotlin.Boolean>){}[0]
+    final fun timeoutPolicy(com.santimattius.resilient.composition/ResilientScope, kotlin.time/Duration = ...): com.santimattius.resilient/ResilientPolicy // com.santimattius.resilient.test/PolicyBuilders.timeoutPolicy|timeoutPolicy(com.santimattius.resilient.composition.ResilientScope;kotlin.time.Duration){}[0]
+}
+
+final fun com.santimattius.resilient.test/TestResilientScope(kotlinx.coroutines/CoroutineDispatcher = ...): com.santimattius.resilient.composition/ResilientScope // com.santimattius.resilient.test/TestResilientScope|TestResilientScope(kotlinx.coroutines.CoroutineDispatcher){}[0]
