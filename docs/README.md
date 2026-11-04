@@ -16,6 +16,7 @@ This reference covers the resilience patterns provided by the **Resilient** libr
 | [Hedging](#hedging) | Launches redundant parallel attempts and returns the first success. | [hedging.md](patterns/hedging.md) |
 | [Cache](#cache) | Stores successful results with a TTL to avoid redundant calls. | [cache.md](patterns/cache.md) |
 | [Fallback](#fallback) | Returns a safe default value when all other policies have failed. | [fallback.md](patterns/fallback.md) |
+| [Typed Policies and Templates](#typed-policies-and-templates) | Typed execution input and reusable, context-free policy templates. | [typed-policies.md](patterns/typed-policies.md) |
 
 ---
 
@@ -74,6 +75,13 @@ Stores the successful result of a suspend call against a key with a Time-To-Live
 The outermost safety net: when every other policy has been exhausted and the operation still fails, Fallback invokes a user-supplied function to produce an alternative value. Common uses include returning stale data, a sensible default, or an error model understood by the caller.
 
 → [Read full documentation](patterns/fallback.md)
+
+---
+
+### Typed Policies and Templates
+`resilientFor<Input> { }` builds a policy whose `execute(input) { ... }` passes an explicit typed input to the protected block. `resilienceTemplate { }` defines immutable, context-free policy definitions that any build can `include(...)`. Local blocks overlay the included clone, every build keeps independent state, and state is shared only through explicit named registries. Global and keyed rate limiters compose in a single `execute` call without exposing raw inputs or keys.
+
+→ [Read full documentation](patterns/typed-policies.md)
 
 ---
 

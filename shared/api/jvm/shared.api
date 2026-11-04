@@ -332,10 +332,12 @@ public final class com/santimattius/resilient/composition/TypedResilientBuilder 
 	public final fun bulkhead (Lkotlin/jvm/functions/Function1;)V
 	public final fun bulkheadNamed (Lcom/santimattius/resilient/bulkhead/BulkheadRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public final fun cache (Lkotlin/jvm/functions/Function1;)V
+	public final fun cacheKeyFor (Lkotlin/jvm/functions/Function1;)V
 	public final fun chaos (Lkotlin/jvm/functions/Function1;)V
 	public final fun circuitBreaker (Lkotlin/jvm/functions/Function1;)V
 	public final fun circuitBreakerNamed (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerRegistry;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public final fun coalesce (Lkotlin/jvm/functions/Function1;)V
+	public final fun coalesceKeyFor (Lkotlin/jvm/functions/Function1;)V
 	public final fun compositionOrder (Ljava/util/List;)V
 	public final fun fallback (Lcom/santimattius/resilient/fallback/FallbackConfig;)V
 	public final fun hedging (Lkotlin/jvm/functions/Function1;)V

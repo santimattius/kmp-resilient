@@ -133,8 +133,8 @@ class TypedResilientPolicyTest {
                 }
             }
             val scope = ResilientScope()
-            val first = resilientFor<UserId>(scope) { include(template) }
-            val second = resilientFor<OrderId>(scope) { include(template) }
+            val first = resilientFor<UserId>(scope) { include(template); cacheKeyFor { it.value } }
+            val second = resilientFor<OrderId>(scope) { include(template); cacheKeyFor { it.value.toString() } }
             var calls = 0
 
             first.execute(UserId("a")) { ++calls }
@@ -174,6 +174,7 @@ class TypedResilientPolicyTest {
                     key = "k"
                     ttl = 10.seconds
                 }
+                cacheKeyFor { it.value }
                 rateLimiterNamed(registry, "global") {
                     maxCalls = 5
                     period = 60.seconds
