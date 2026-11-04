@@ -242,6 +242,7 @@ class ResilientViewModel : ViewModel() {
         is ResilientEvent.FallbackTriggered -> "Fallback: ${event.error.message}"
         is ResilientEvent.HedgingUsed -> "Hedging attempt ${event.attemptIndex + 1}"
         is ResilientEvent.RateLimited -> "Rate limited: wait ${event.waitTime}"
+        is ResilientEvent.KeyedRateLimited -> "Keyed rate limited"
         is ResilientEvent.BulkheadRejected -> "Bulkhead: ${event.reason}"
     }
 }
