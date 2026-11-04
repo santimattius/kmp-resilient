@@ -89,3 +89,23 @@ compositionOrder(listOf(OrderablePolicyType.KEYED_RATE_LIMITER, OrderablePolicyT
 
 - [Rate Limiter](rate-limiter.md#keyed-rate-limiter)
 - [Composition Order](../README.md#composition-order)
+
+## Cache and coalescing keys
+
+`cache { }` and `coalesce { }` normally use a build-time key, which in a typed policy would make different inputs share one cache entry or in-flight call. A typed policy therefore **fails closed**: if it configures cache or coalescing (directly or via an included template) without an input-derived key, `resilientFor` throws `IllegalArgumentException`.
+
+```kotlin
+val template = resilienceTemplate { cache { ttl = 30.seconds } }   // context-free: no key yet
+
+val users = resilientFor<UserId>(scope) {
+    include(template)
+    cacheKeyFor { "user:${it.value}" }      // required with cache
+    coalesce { }
+    coalesceKeyFor { it.value }             // required with coalesce
+}
+```
+
+- Different inputs never share entries; equal keys hit the cache or join the in-flight call.
+- `cacheKeyFor`/`coalesceKeyFor` without the matching `cache { }`/`coalesce { }` also fail the build.
+- Privacy: `CacheHit`/`CacheMiss` events of typed policies carry the redacted key `<input-key>`. The derived key does not appear in events, snapshots or exception messages. `cacheHandle.invalidate(key)` still takes the raw derived key.
+- `resilient { }` behavior is unchanged.

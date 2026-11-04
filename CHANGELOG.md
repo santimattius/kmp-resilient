@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - `OrderablePolicyType.KEYED_RATE_LIMITER` for independent ordering; by default it runs right after `RATE_LIMITER`.
 - **Typed resilient policies**
   - `resilientFor<Input> { ... }` (also `CoroutineScope.resilientFor`) builds a `TypedResilientPolicy<Input>` whose `execute(input) { ... }` passes an explicit typed input to the protected block, on the same engine as `resilient { }`.
+- **Input-derived cache and coalescing keys for typed policies**
+  - `cacheKeyFor { input -> ... }` and `coalesceKeyFor { input -> ... }` on `TypedResilientBuilder<Input>`. `resilientFor` now fails closed (`IllegalArgumentException`) when `cache { }` or `coalesce { }` is configured without them, so different inputs can no longer share one cache entry or in-flight call (#55). Typed cache events report a redacted key. `resilient { }` is unchanged.
 - **Reusable resilience templates**
   - Immutable, context-free `resilienceTemplate { ... }` and `include(template)` for `resilient { }` and `resilientFor<Input> { }`; a later local block overlays the included clone, a second template for the same ordinary policy type replaces the first, and every build keeps independent state unless it uses explicit named registries.
 

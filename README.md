@@ -498,6 +498,17 @@ val result = search.execute(Request("acme")) { request -> api.search(request) }
 
 **Global + keyed rate limiting:** both apply in one `execute(input)` call. By default the global limiter runs outside the keyed one (a call rejected globally never creates a key bucket); change it with `compositionOrder(listOf(OrderablePolicyType.KEYED_RATE_LIMITER, OrderablePolicyType.RATE_LIMITER))`. Inspect state with `getHealthSnapshot().rateLimiter` and `getKeyedRateLimiterSnapshot()`.
 
+**Cache and coalescing keys:** a typed policy that configures `cache { }` or `coalesce { }` must derive the key from the input, otherwise the static key would share one entry (or in-flight call) across different inputs. Use `cacheKeyFor { input -> ... }` and `coalesceKeyFor { input -> ... }` in the `resilientFor` block; building without them throws `IllegalArgumentException`. A template may declare `cache { ttl = ... }`, and the typed policy supplies the key locally. `resilient { }` is unchanged.
+```kotlin
+val users = resilientFor<UserId>(scope) {
+    cache { ttl = 30.seconds }
+    cacheKeyFor { "user:${it.value}" }
+    coalesce { }
+    coalesceKeyFor { it.value }
+}
+```
+Cache events (`CacheHit`/`CacheMiss`) of typed policies report the redacted key `<input-key>`, never the derived key.
+
 **Privacy:** raw inputs and derived keys never appear in events (`ResilientEvent.KeyedRateLimited` is keyless), snapshots (aggregate counts only) or exception messages.
 
 → [In-depth documentation](docs/patterns/typed-policies.md)
