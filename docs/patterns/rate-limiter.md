@@ -176,6 +176,8 @@ suspend fun callWithBothLimits(request: Request): List<Result> =
     }
 ```
 
+With typed policies the same combination is declared in one builder and executed with a single `execute(input)` call (see [Typed Policies and Templates](typed-policies.md#global-and-keyed-rate-limiting)).
+
 Choose and document the nesting order for your product: the example consumes global quota before per-key quota. The keyed limiter does not emit a key-valued telemetry event, and `onRateLimited` receives no key. Do not log, tag, or export raw tenant/user keys; use an approved bounded or hashed dimension if grouping is required.
 
 ---

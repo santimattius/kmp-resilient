@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+---
+## [2.1.0] - Unreleased
+
 ### Added
 
 - **Keyed Rate Limiter**
@@ -17,12 +20,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - `keyedRateLimiter<K> { ... }` and `keyedRateLimiterNamed<K>(registry, name) { ... }` in `resilientFor<Input>`, composable with the global rate limiter in one `execute(input)` call.
   - `KeyedRateLimiterRegistry`, `KeyedRateLimiter.snapshot()` and `TypedResilientPolicy.getKeyedRateLimiterSnapshot()`; none expose raw inputs or keys.
   - `OrderablePolicyType.KEYED_RATE_LIMITER` for independent ordering; by default it runs right after `RATE_LIMITER`.
-- **Benchmark module** *(new module: `:benchmark` — not published)*
-  - Standalone `:benchmark` module using `kotlinx-benchmark 0.4.17` for reproducible, microsecond-resolution performance measurements.
-  - `RetryBenchmark`: measures `RetryPolicy.execute` throughput under immediate success, single transient failure, and full-retry-exhaust scenarios.
-  - `CircuitBreakerBenchmark`: measures `CircuitBreaker.execute` throughput when CLOSED (happy-path), OPEN (fast-reject), and HALF_OPEN (recovery probe) states.
-  - Targets: JVM (primary), macOS arm64, JS/Node.js — matching the `:shared` KMP target matrix.
-  - CI smoke job (`benchmark-smoke`) runs `jvmBenchmark` on every PR to catch performance regressions early.
+- **Typed resilient policies**
+  - `resilientFor<Input> { ... }` (also `CoroutineScope.resilientFor`) builds a `TypedResilientPolicy<Input>` whose `execute(input) { ... }` passes an explicit typed input to the protected block, on the same engine as `resilient { }`.
+- **Input-derived cache and coalescing keys for typed policies**
+  - `cacheKeyFor { input -> ... }` and `coalesceKeyFor { input -> ... }` on `TypedResilientBuilder<Input>`. `resilientFor` now fails closed (`IllegalArgumentException`) when `cache { }` or `coalesce { }` is configured without them, so different inputs can no longer share one cache entry or in-flight call (#55). Typed cache events report a redacted key. `resilient { }` is unchanged.
+- **Reusable resilience templates**
+  - Immutable, context-free `resilienceTemplate { ... }` and `include(template)` for `resilient { }` and `resilientFor<Input> { }`; a later local block overlays the included clone, a second template for the same ordinary policy type replaces the first, and every build keeps independent state unless it uses explicit named registries.
 
 ### Fixed
 
@@ -32,13 +35,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - **Telemetry (source-incompatible for exhaustive `when`)**
-  - New sealed subtype `ResilientEvent.KeyedRateLimited` (keyless). Consumers that exhaustively match `ResilientEvent` must handle it; the OpenTelemetry and Micrometer exporters now count it. Acceptable under the current pre-release line; the next release version must reflect this.
-- **Dependencies**
-  - Kotlin `2.4.0`
-  - Android Gradle Plugin `9.2.1`
-  - Kotlinx Coroutines `1.11.0`
-  - Ktor `3.5.0`
-  - Gradle Wrapper `9.4.1`
+  - New sealed subtype `ResilientEvent.KeyedRateLimited` (keyless). Consumers that exhaustively match `ResilientEvent` must handle it; the OpenTelemetry and Micrometer exporters now count it. This is binary compatible and is released as a minor version.
+- **Build**
+  - Added binary API validation (`apiCheck`) for the public API.
+
+---
+
+## [2.0.1] - 2026-08-11
+
+### Added
+
+- Dokka multi-module API documentation generation.
+- Maven publishing for `resilient-micrometer` and `resilient-otel`.
+
+---
+
+## [2.0.0] - 2026-06-29
+
+### Changed
+
+- Release of 2.0.0; no code changes since `2.0.0-ALPHA02` (project version update only).
+
+---
+
+## [2.0.0-ALPHA02] - 2026-06-27
+
+### Added
+
+- Standalone `:benchmark` module (`kotlinx-benchmark`) with `RetryBenchmark` and `CircuitBreakerBenchmark`, plus a CI smoke job.
+
+### Changed
+
+- **Dependencies**: Kotlin `2.4.0`, Android Gradle Plugin `9.2.1`, Kotlinx Coroutines `1.11.0`, Ktor `3.5.0`, Gradle Wrapper `9.4.1`.
 
 ---
 
@@ -254,6 +282,9 @@ Planned items: cache (dynamic key, invalidation), timeout (documentation and per
 
 ---
 
+[2.0.1]: https://github.com/santimattius/kmp-resilient/compare/2.0.0...2.0.1
+[2.0.0]: https://github.com/santimattius/kmp-resilient/compare/2.0.0-ALPHA02...2.0.0
+[2.0.0-ALPHA02]: https://github.com/santimattius/kmp-resilient/compare/2.0.0-ALPHA01...2.0.0-ALPHA02
 [2.0.0-ALPHA01]: https://github.com/santimattius/kmp-resilient/compare/1.5.0...2.0.0-ALPHA01
 [1.5.0]: https://github.com/santimattius/kmp-resilient/compare/1.4.0...1.5.0
 [1.4.0]: https://github.com/santimattius/kmp-resilient/compare/1.3.0...1.4.0

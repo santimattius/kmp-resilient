@@ -1,0 +1,844 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, iosX64, js, macosArm64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.santimattius.resilient:shared>
+open annotation class com.santimattius.resilient.annotations/ResilientExperimentalApi : kotlin/Annotation { // com.santimattius.resilient.annotations/ResilientExperimentalApi|null[0]
+    constructor <init>() // com.santimattius.resilient.annotations/ResilientExperimentalApi.<init>|<init>(){}[0]
+}
+
+final enum class com.santimattius.resilient.circuitbreaker/CircuitState : kotlin/Enum<com.santimattius.resilient.circuitbreaker/CircuitState> { // com.santimattius.resilient.circuitbreaker/CircuitState|null[0]
+    enum entry CLOSED // com.santimattius.resilient.circuitbreaker/CircuitState.CLOSED|null[0]
+    enum entry HALF_OPEN // com.santimattius.resilient.circuitbreaker/CircuitState.HALF_OPEN|null[0]
+    enum entry OPEN // com.santimattius.resilient.circuitbreaker/CircuitState.OPEN|null[0]
+
+    final val entries // com.santimattius.resilient.circuitbreaker/CircuitState.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.santimattius.resilient.circuitbreaker/CircuitState> // com.santimattius.resilient.circuitbreaker/CircuitState.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.circuitbreaker/CircuitState.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.santimattius.resilient.circuitbreaker/CircuitState> // com.santimattius.resilient.circuitbreaker/CircuitState.values|values#static(){}[0]
+}
+
+final enum class com.santimattius.resilient.composition/OrderablePolicyType : kotlin/Enum<com.santimattius.resilient.composition/OrderablePolicyType> { // com.santimattius.resilient.composition/OrderablePolicyType|null[0]
+    enum entry BULKHEAD // com.santimattius.resilient.composition/OrderablePolicyType.BULKHEAD|null[0]
+    enum entry CACHE // com.santimattius.resilient.composition/OrderablePolicyType.CACHE|null[0]
+    enum entry CHAOS // com.santimattius.resilient.composition/OrderablePolicyType.CHAOS|null[0]
+    enum entry CIRCUIT_BREAKER // com.santimattius.resilient.composition/OrderablePolicyType.CIRCUIT_BREAKER|null[0]
+    enum entry COALESCE // com.santimattius.resilient.composition/OrderablePolicyType.COALESCE|null[0]
+    enum entry HEDGING // com.santimattius.resilient.composition/OrderablePolicyType.HEDGING|null[0]
+    enum entry KEYED_RATE_LIMITER // com.santimattius.resilient.composition/OrderablePolicyType.KEYED_RATE_LIMITER|null[0]
+    enum entry RATE_LIMITER // com.santimattius.resilient.composition/OrderablePolicyType.RATE_LIMITER|null[0]
+    enum entry RETRY // com.santimattius.resilient.composition/OrderablePolicyType.RETRY|null[0]
+    enum entry TIMEOUT // com.santimattius.resilient.composition/OrderablePolicyType.TIMEOUT|null[0]
+
+    final val entries // com.santimattius.resilient.composition/OrderablePolicyType.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.santimattius.resilient.composition/OrderablePolicyType> // com.santimattius.resilient.composition/OrderablePolicyType.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.santimattius.resilient.composition/OrderablePolicyType // com.santimattius.resilient.composition/OrderablePolicyType.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.santimattius.resilient.composition/OrderablePolicyType> // com.santimattius.resilient.composition/OrderablePolicyType.values|values#static(){}[0]
+}
+
+abstract interface com.santimattius.resilient.bulkhead/Bulkhead { // com.santimattius.resilient.bulkhead/Bulkhead|null[0]
+    abstract suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.bulkhead/Bulkhead.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+    open fun snapshot(): com.santimattius.resilient.bulkhead/BulkheadSnapshot? // com.santimattius.resilient.bulkhead/Bulkhead.snapshot|snapshot(){}[0]
+}
+
+abstract interface com.santimattius.resilient.cache/CacheHandle { // com.santimattius.resilient.cache/CacheHandle|null[0]
+    abstract suspend fun invalidate(kotlin/String) // com.santimattius.resilient.cache/CacheHandle.invalidate|invalidate(kotlin.String){}[0]
+    abstract suspend fun invalidatePrefix(kotlin/String) // com.santimattius.resilient.cache/CacheHandle.invalidatePrefix|invalidatePrefix(kotlin.String){}[0]
+}
+
+abstract interface com.santimattius.resilient.cache/CachePolicy { // com.santimattius.resilient.cache/CachePolicy|null[0]
+    abstract suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.cache/CachePolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+abstract interface com.santimattius.resilient.circuitbreaker/CircuitBreaker { // com.santimattius.resilient.circuitbreaker/CircuitBreaker|null[0]
+    abstract val state // com.santimattius.resilient.circuitbreaker/CircuitBreaker.state|{}state[0]
+        abstract fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.santimattius.resilient.circuitbreaker/CircuitState> // com.santimattius.resilient.circuitbreaker/CircuitBreaker.state.<get-state>|<get-state>(){}[0]
+
+    abstract fun snapshot(): com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot // com.santimattius.resilient.circuitbreaker/CircuitBreaker.snapshot|snapshot(){}[0]
+    abstract suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.circuitbreaker/CircuitBreaker.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+abstract interface com.santimattius.resilient.circuitbreaker/TimeSource { // com.santimattius.resilient.circuitbreaker/TimeSource|null[0]
+    abstract fun currentTimeMillis(): kotlin/Long // com.santimattius.resilient.circuitbreaker/TimeSource.currentTimeMillis|currentTimeMillis(){}[0]
+}
+
+abstract interface com.santimattius.resilient.coalescing/CoalescingPolicy { // com.santimattius.resilient.coalescing/CoalescingPolicy|null[0]
+    abstract suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.coalescing/CoalescingPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+abstract interface com.santimattius.resilient.hedging/HedgingPolicy { // com.santimattius.resilient.hedging/HedgingPolicy|null[0]
+    abstract suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.hedging/HedgingPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+abstract interface com.santimattius.resilient.ratelimiter/RateLimiter { // com.santimattius.resilient.ratelimiter/RateLimiter|null[0]
+    abstract suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.ratelimiter/RateLimiter.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+abstract interface com.santimattius.resilient.retry/RetryPolicy { // com.santimattius.resilient.retry/RetryPolicy|null[0]
+    abstract suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.retry/RetryPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+abstract interface com.santimattius.resilient.timeout/TimeoutPolicy { // com.santimattius.resilient.timeout/TimeoutPolicy|null[0]
+    abstract suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.timeout/TimeoutPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+abstract interface com.santimattius.resilient/ResilientPolicy : kotlin/AutoCloseable { // com.santimattius.resilient/ResilientPolicy|null[0]
+    abstract val events // com.santimattius.resilient/ResilientPolicy.events|{}events[0]
+        abstract fun <get-events>(): kotlinx.coroutines.flow/SharedFlow<com.santimattius.resilient.telemetry/ResilientEvent> // com.santimattius.resilient/ResilientPolicy.events.<get-events>|<get-events>(){}[0]
+    open val cacheHandle // com.santimattius.resilient/ResilientPolicy.cacheHandle|{}cacheHandle[0]
+        open fun <get-cacheHandle>(): com.santimattius.resilient.cache/CacheHandle? // com.santimattius.resilient/ResilientPolicy.cacheHandle.<get-cacheHandle>|<get-cacheHandle>(){}[0]
+
+    abstract suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient/ResilientPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+    open fun getHealthSnapshot(): com.santimattius.resilient/PolicyHealthSnapshot // com.santimattius.resilient/ResilientPolicy.getHealthSnapshot|getHealthSnapshot(){}[0]
+}
+
+sealed interface com.santimattius.resilient.retry/BackoffStrategy { // com.santimattius.resilient.retry/BackoffStrategy|null[0]
+    abstract suspend fun delay(kotlin/Int) // com.santimattius.resilient.retry/BackoffStrategy.delay|delay(kotlin.Int){}[0]
+}
+
+sealed interface com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent|null[0]
+    final class BulkheadRejected : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.BulkheadRejected|null[0]
+        constructor <init>(kotlin/String) // com.santimattius.resilient.telemetry/ResilientEvent.BulkheadRejected.<init>|<init>(kotlin.String){}[0]
+
+        final val reason // com.santimattius.resilient.telemetry/ResilientEvent.BulkheadRejected.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.BulkheadRejected.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.BulkheadRejected.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.santimattius.resilient.telemetry/ResilientEvent.BulkheadRejected // com.santimattius.resilient.telemetry/ResilientEvent.BulkheadRejected.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.BulkheadRejected.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.BulkheadRejected.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.BulkheadRejected.toString|toString(){}[0]
+    }
+
+    final class CacheHit : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.CacheHit|null[0]
+        constructor <init>(kotlin/String) // com.santimattius.resilient.telemetry/ResilientEvent.CacheHit.<init>|<init>(kotlin.String){}[0]
+
+        final val key // com.santimattius.resilient.telemetry/ResilientEvent.CacheHit.key|{}key[0]
+            final fun <get-key>(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.CacheHit.key.<get-key>|<get-key>(){}[0]
+
+        final fun component1(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.CacheHit.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.santimattius.resilient.telemetry/ResilientEvent.CacheHit // com.santimattius.resilient.telemetry/ResilientEvent.CacheHit.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.CacheHit.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.CacheHit.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.CacheHit.toString|toString(){}[0]
+    }
+
+    final class CacheMiss : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.CacheMiss|null[0]
+        constructor <init>(kotlin/String) // com.santimattius.resilient.telemetry/ResilientEvent.CacheMiss.<init>|<init>(kotlin.String){}[0]
+
+        final val key // com.santimattius.resilient.telemetry/ResilientEvent.CacheMiss.key|{}key[0]
+            final fun <get-key>(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.CacheMiss.key.<get-key>|<get-key>(){}[0]
+
+        final fun component1(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.CacheMiss.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.santimattius.resilient.telemetry/ResilientEvent.CacheMiss // com.santimattius.resilient.telemetry/ResilientEvent.CacheMiss.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.CacheMiss.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.CacheMiss.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.CacheMiss.toString|toString(){}[0]
+    }
+
+    final class CircuitStateChanged : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged|null[0]
+        constructor <init>(com.santimattius.resilient.circuitbreaker/CircuitState, com.santimattius.resilient.circuitbreaker/CircuitState) // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.<init>|<init>(com.santimattius.resilient.circuitbreaker.CircuitState;com.santimattius.resilient.circuitbreaker.CircuitState){}[0]
+
+        final val from // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.from|{}from[0]
+            final fun <get-from>(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.from.<get-from>|<get-from>(){}[0]
+        final val to // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.to|{}to[0]
+            final fun <get-to>(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.to.<get-to>|<get-to>(){}[0]
+
+        final fun component1(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.component1|component1(){}[0]
+        final fun component2(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.component2|component2(){}[0]
+        final fun copy(com.santimattius.resilient.circuitbreaker/CircuitState = ..., com.santimattius.resilient.circuitbreaker/CircuitState = ...): com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.copy|copy(com.santimattius.resilient.circuitbreaker.CircuitState;com.santimattius.resilient.circuitbreaker.CircuitState){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.CircuitStateChanged.toString|toString(){}[0]
+    }
+
+    final class FallbackTriggered : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.FallbackTriggered|null[0]
+        constructor <init>(kotlin/Throwable) // com.santimattius.resilient.telemetry/ResilientEvent.FallbackTriggered.<init>|<init>(kotlin.Throwable){}[0]
+
+        final val error // com.santimattius.resilient.telemetry/ResilientEvent.FallbackTriggered.error|{}error[0]
+            final fun <get-error>(): kotlin/Throwable // com.santimattius.resilient.telemetry/ResilientEvent.FallbackTriggered.error.<get-error>|<get-error>(){}[0]
+
+        final fun component1(): kotlin/Throwable // com.santimattius.resilient.telemetry/ResilientEvent.FallbackTriggered.component1|component1(){}[0]
+        final fun copy(kotlin/Throwable = ...): com.santimattius.resilient.telemetry/ResilientEvent.FallbackTriggered // com.santimattius.resilient.telemetry/ResilientEvent.FallbackTriggered.copy|copy(kotlin.Throwable){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.FallbackTriggered.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.FallbackTriggered.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.FallbackTriggered.toString|toString(){}[0]
+    }
+
+    final class HedgingUsed : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.HedgingUsed|null[0]
+        constructor <init>(kotlin/Int) // com.santimattius.resilient.telemetry/ResilientEvent.HedgingUsed.<init>|<init>(kotlin.Int){}[0]
+
+        final val attemptIndex // com.santimattius.resilient.telemetry/ResilientEvent.HedgingUsed.attemptIndex|{}attemptIndex[0]
+            final fun <get-attemptIndex>(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.HedgingUsed.attemptIndex.<get-attemptIndex>|<get-attemptIndex>(){}[0]
+
+        final fun component1(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.HedgingUsed.component1|component1(){}[0]
+        final fun copy(kotlin/Int = ...): com.santimattius.resilient.telemetry/ResilientEvent.HedgingUsed // com.santimattius.resilient.telemetry/ResilientEvent.HedgingUsed.copy|copy(kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.HedgingUsed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.HedgingUsed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.HedgingUsed.toString|toString(){}[0]
+    }
+
+    final class OperationFailure : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure|null[0]
+        constructor <init>(kotlin/Throwable, kotlin.time/Duration) // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.<init>|<init>(kotlin.Throwable;kotlin.time.Duration){}[0]
+
+        final val duration // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.duration|{}duration[0]
+            final fun <get-duration>(): kotlin.time/Duration // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.duration.<get-duration>|<get-duration>(){}[0]
+        final val error // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.error|{}error[0]
+            final fun <get-error>(): kotlin/Throwable // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.error.<get-error>|<get-error>(){}[0]
+
+        final fun component1(): kotlin/Throwable // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.component1|component1(){}[0]
+        final fun component2(): kotlin.time/Duration // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.component2|component2(){}[0]
+        final fun copy(kotlin/Throwable = ..., kotlin.time/Duration = ...): com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.copy|copy(kotlin.Throwable;kotlin.time.Duration){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.OperationFailure.toString|toString(){}[0]
+    }
+
+    final class OperationSuccess : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.OperationSuccess|null[0]
+        constructor <init>(kotlin.time/Duration) // com.santimattius.resilient.telemetry/ResilientEvent.OperationSuccess.<init>|<init>(kotlin.time.Duration){}[0]
+
+        final val duration // com.santimattius.resilient.telemetry/ResilientEvent.OperationSuccess.duration|{}duration[0]
+            final fun <get-duration>(): kotlin.time/Duration // com.santimattius.resilient.telemetry/ResilientEvent.OperationSuccess.duration.<get-duration>|<get-duration>(){}[0]
+
+        final fun component1(): kotlin.time/Duration // com.santimattius.resilient.telemetry/ResilientEvent.OperationSuccess.component1|component1(){}[0]
+        final fun copy(kotlin.time/Duration = ...): com.santimattius.resilient.telemetry/ResilientEvent.OperationSuccess // com.santimattius.resilient.telemetry/ResilientEvent.OperationSuccess.copy|copy(kotlin.time.Duration){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.OperationSuccess.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.OperationSuccess.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.OperationSuccess.toString|toString(){}[0]
+    }
+
+    final class RateLimited : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.RateLimited|null[0]
+        constructor <init>(kotlin.time/Duration) // com.santimattius.resilient.telemetry/ResilientEvent.RateLimited.<init>|<init>(kotlin.time.Duration){}[0]
+
+        final val waitTime // com.santimattius.resilient.telemetry/ResilientEvent.RateLimited.waitTime|{}waitTime[0]
+            final fun <get-waitTime>(): kotlin.time/Duration // com.santimattius.resilient.telemetry/ResilientEvent.RateLimited.waitTime.<get-waitTime>|<get-waitTime>(){}[0]
+
+        final fun component1(): kotlin.time/Duration // com.santimattius.resilient.telemetry/ResilientEvent.RateLimited.component1|component1(){}[0]
+        final fun copy(kotlin.time/Duration = ...): com.santimattius.resilient.telemetry/ResilientEvent.RateLimited // com.santimattius.resilient.telemetry/ResilientEvent.RateLimited.copy|copy(kotlin.time.Duration){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.RateLimited.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.RateLimited.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.RateLimited.toString|toString(){}[0]
+    }
+
+    final class RetryAttempt : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt|null[0]
+        constructor <init>(kotlin/Int, kotlin/Throwable) // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.<init>|<init>(kotlin.Int;kotlin.Throwable){}[0]
+
+        final val attempt // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.attempt|{}attempt[0]
+            final fun <get-attempt>(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.attempt.<get-attempt>|<get-attempt>(){}[0]
+        final val error // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.error|{}error[0]
+            final fun <get-error>(): kotlin/Throwable // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.error.<get-error>|<get-error>(){}[0]
+
+        final fun component1(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.component1|component1(){}[0]
+        final fun component2(): kotlin/Throwable // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.component2|component2(){}[0]
+        final fun copy(kotlin/Int = ..., kotlin/Throwable = ...): com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.copy|copy(kotlin.Int;kotlin.Throwable){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.RetryAttempt.toString|toString(){}[0]
+    }
+
+    final class TimeoutTriggered : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.TimeoutTriggered|null[0]
+        constructor <init>(kotlin.time/Duration) // com.santimattius.resilient.telemetry/ResilientEvent.TimeoutTriggered.<init>|<init>(kotlin.time.Duration){}[0]
+
+        final val timeout // com.santimattius.resilient.telemetry/ResilientEvent.TimeoutTriggered.timeout|{}timeout[0]
+            final fun <get-timeout>(): kotlin.time/Duration // com.santimattius.resilient.telemetry/ResilientEvent.TimeoutTriggered.timeout.<get-timeout>|<get-timeout>(){}[0]
+
+        final fun component1(): kotlin.time/Duration // com.santimattius.resilient.telemetry/ResilientEvent.TimeoutTriggered.component1|component1(){}[0]
+        final fun copy(kotlin.time/Duration = ...): com.santimattius.resilient.telemetry/ResilientEvent.TimeoutTriggered // com.santimattius.resilient.telemetry/ResilientEvent.TimeoutTriggered.copy|copy(kotlin.time.Duration){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.TimeoutTriggered.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.TimeoutTriggered.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.TimeoutTriggered.toString|toString(){}[0]
+    }
+
+    final object KeyedRateLimited : com.santimattius.resilient.telemetry/ResilientEvent { // com.santimattius.resilient.telemetry/ResilientEvent.KeyedRateLimited|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.telemetry/ResilientEvent.KeyedRateLimited.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.santimattius.resilient.telemetry/ResilientEvent.KeyedRateLimited.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.santimattius.resilient.telemetry/ResilientEvent.KeyedRateLimited.toString|toString(){}[0]
+    }
+}
+
+final class <#A: kotlin/Any?, #B: kotlin/Any?> com.santimattius.resilient.ratelimiter/KeyedRateLimiter { // com.santimattius.resilient.ratelimiter/KeyedRateLimiter|null[0]
+    constructor <init>(com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig<#A, #B>) // com.santimattius.resilient.ratelimiter/KeyedRateLimiter.<init>|<init>(com.santimattius.resilient.ratelimiter.KeyedRateLimiterConfig<1:0,1:1>){}[0]
+
+    final fun snapshot(): com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot // com.santimattius.resilient.ratelimiter/KeyedRateLimiter.snapshot|snapshot(){}[0]
+    final suspend fun <#A1: kotlin/Any?> execute(#A, kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.ratelimiter/KeyedRateLimiter.execute|execute(1:0;kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class <#A: kotlin/Any?, #B: kotlin/Any?> com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig { // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.<init>|<init>(){}[0]
+
+    final var bucketIdleTtl // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.bucketIdleTtl|{}bucketIdleTtl[0]
+        final fun <get-bucketIdleTtl>(): kotlin.time/Duration // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.bucketIdleTtl.<get-bucketIdleTtl>|<get-bucketIdleTtl>(){}[0]
+        final fun <set-bucketIdleTtl>(kotlin.time/Duration) // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.bucketIdleTtl.<set-bucketIdleTtl>|<set-bucketIdleTtl>(kotlin.time.Duration){}[0]
+    final var keyProvider // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.keyProvider|{}keyProvider[0]
+        final fun <get-keyProvider>(): kotlin/Function1<#A, #B> // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.keyProvider.<get-keyProvider>|<get-keyProvider>(){}[0]
+        final fun <set-keyProvider>(kotlin/Function1<#A, #B>) // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.keyProvider.<set-keyProvider>|<set-keyProvider>(kotlin.Function1<1:0,1:1>){}[0]
+    final var maxBuckets // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.maxBuckets|{}maxBuckets[0]
+        final fun <get-maxBuckets>(): kotlin/Int // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.maxBuckets.<get-maxBuckets>|<get-maxBuckets>(){}[0]
+        final fun <set-maxBuckets>(kotlin/Int) // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.maxBuckets.<set-maxBuckets>|<set-maxBuckets>(kotlin.Int){}[0]
+    final var maxCalls // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.maxCalls|{}maxCalls[0]
+        final fun <get-maxCalls>(): kotlin/Int // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.maxCalls.<get-maxCalls>|<get-maxCalls>(){}[0]
+        final fun <set-maxCalls>(kotlin/Int) // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.maxCalls.<set-maxCalls>|<set-maxCalls>(kotlin.Int){}[0]
+    final var onRateLimited // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.onRateLimited|{}onRateLimited[0]
+        final fun <get-onRateLimited>(): kotlin.coroutines/SuspendFunction0<kotlin/Unit> // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.onRateLimited.<get-onRateLimited>|<get-onRateLimited>(){}[0]
+        final fun <set-onRateLimited>(kotlin.coroutines/SuspendFunction0<kotlin/Unit>) // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.onRateLimited.<set-onRateLimited>|<set-onRateLimited>(kotlin.coroutines.SuspendFunction0<kotlin.Unit>){}[0]
+    final var period // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.period|{}period[0]
+        final fun <get-period>(): kotlin.time/Duration // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.period.<get-period>|<get-period>(){}[0]
+        final fun <set-period>(kotlin.time/Duration) // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.period.<set-period>|<set-period>(kotlin.time.Duration){}[0]
+    final var timeSource // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.timeSource|{}timeSource[0]
+        final fun <get-timeSource>(): com.santimattius.resilient.circuitbreaker/TimeSource // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.timeSource.<get-timeSource>|<get-timeSource>(){}[0]
+        final fun <set-timeSource>(com.santimattius.resilient.circuitbreaker/TimeSource) // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.timeSource.<set-timeSource>|<set-timeSource>(com.santimattius.resilient.circuitbreaker.TimeSource){}[0]
+    final var timeoutWhenLimited // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.timeoutWhenLimited|{}timeoutWhenLimited[0]
+        final fun <get-timeoutWhenLimited>(): kotlin.time/Duration? // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.timeoutWhenLimited.<get-timeoutWhenLimited>|<get-timeoutWhenLimited>(){}[0]
+        final fun <set-timeoutWhenLimited>(kotlin.time/Duration?) // com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig.timeoutWhenLimited.<set-timeoutWhenLimited>|<set-timeoutWhenLimited>(kotlin.time.Duration?){}[0]
+}
+
+final class <#A: kotlin/Any?> com.santimattius.resilient.composition/TypedResilientBuilder { // com.santimattius.resilient.composition/TypedResilientBuilder|null[0]
+    final fun <#A1: kotlin/Any?> keyedRateLimiter(kotlin/Function1<com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig<#A, #A1>, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.keyedRateLimiter|keyedRateLimiter(kotlin.Function1<com.santimattius.resilient.ratelimiter.KeyedRateLimiterConfig<1:0,0:0>,kotlin.Unit>){0§<kotlin.Any?>}[0]
+    final fun <#A1: kotlin/Any?> keyedRateLimiterNamed(com.santimattius.resilient.ratelimiter/KeyedRateLimiterRegistry, kotlin/String, kotlin/Function1<com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig<#A, #A1>, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.keyedRateLimiterNamed|keyedRateLimiterNamed(com.santimattius.resilient.ratelimiter.KeyedRateLimiterRegistry;kotlin.String;kotlin.Function1<com.santimattius.resilient.ratelimiter.KeyedRateLimiterConfig<1:0,0:0>,kotlin.Unit>){0§<kotlin.Any?>}[0]
+    final fun bulkhead(kotlin/Function1<com.santimattius.resilient.bulkhead/BulkheadConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.bulkhead|bulkhead(kotlin.Function1<com.santimattius.resilient.bulkhead.BulkheadConfig,kotlin.Unit>){}[0]
+    final fun bulkheadNamed(com.santimattius.resilient.bulkhead/BulkheadRegistry, kotlin/String, kotlin/Function1<com.santimattius.resilient.bulkhead/BulkheadConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.bulkheadNamed|bulkheadNamed(com.santimattius.resilient.bulkhead.BulkheadRegistry;kotlin.String;kotlin.Function1<com.santimattius.resilient.bulkhead.BulkheadConfig,kotlin.Unit>){}[0]
+    final fun cache(kotlin/Function1<com.santimattius.resilient.cache/CacheConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.cache|cache(kotlin.Function1<com.santimattius.resilient.cache.CacheConfig,kotlin.Unit>){}[0]
+    final fun cacheKeyFor(kotlin/Function1<#A, kotlin/String>) // com.santimattius.resilient.composition/TypedResilientBuilder.cacheKeyFor|cacheKeyFor(kotlin.Function1<1:0,kotlin.String>){}[0]
+    final fun chaos(kotlin/Function1<com.santimattius.resilient.chaos/ChaosConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.chaos|chaos(kotlin.Function1<com.santimattius.resilient.chaos.ChaosConfig,kotlin.Unit>){}[0]
+    final fun circuitBreaker(kotlin/Function1<com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.circuitBreaker|circuitBreaker(kotlin.Function1<com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig,kotlin.Unit>){}[0]
+    final fun circuitBreakerNamed(com.santimattius.resilient.circuitbreaker/CircuitBreakerRegistry, kotlin/String, kotlin/Function1<com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.circuitBreakerNamed|circuitBreakerNamed(com.santimattius.resilient.circuitbreaker.CircuitBreakerRegistry;kotlin.String;kotlin.Function1<com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig,kotlin.Unit>){}[0]
+    final fun coalesce(kotlin/Function1<com.santimattius.resilient.coalescing/CoalesceConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.coalesce|coalesce(kotlin.Function1<com.santimattius.resilient.coalescing.CoalesceConfig,kotlin.Unit>){}[0]
+    final fun coalesceKeyFor(kotlin/Function1<#A, kotlin/String>) // com.santimattius.resilient.composition/TypedResilientBuilder.coalesceKeyFor|coalesceKeyFor(kotlin.Function1<1:0,kotlin.String>){}[0]
+    final fun compositionOrder(kotlin.collections/List<com.santimattius.resilient.composition/OrderablePolicyType>) // com.santimattius.resilient.composition/TypedResilientBuilder.compositionOrder|compositionOrder(kotlin.collections.List<com.santimattius.resilient.composition.OrderablePolicyType>){}[0]
+    final fun fallback(com.santimattius.resilient.fallback/FallbackConfig<kotlin/Any?>) // com.santimattius.resilient.composition/TypedResilientBuilder.fallback|fallback(com.santimattius.resilient.fallback.FallbackConfig<kotlin.Any?>){}[0]
+    final fun hedging(kotlin/Function1<com.santimattius.resilient.hedging/HedgingConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.hedging|hedging(kotlin.Function1<com.santimattius.resilient.hedging.HedgingConfig,kotlin.Unit>){}[0]
+    final fun include(com.santimattius.resilient.composition/ResilienceTemplate) // com.santimattius.resilient.composition/TypedResilientBuilder.include|include(com.santimattius.resilient.composition.ResilienceTemplate){}[0]
+    final fun rateLimiter(kotlin/Function1<com.santimattius.resilient.ratelimiter/RateLimiterConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.rateLimiter|rateLimiter(kotlin.Function1<com.santimattius.resilient.ratelimiter.RateLimiterConfig,kotlin.Unit>){}[0]
+    final fun rateLimiterNamed(com.santimattius.resilient.ratelimiter/RateLimiterRegistry, kotlin/String, kotlin/Function1<com.santimattius.resilient.ratelimiter/RateLimiterConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.rateLimiterNamed|rateLimiterNamed(com.santimattius.resilient.ratelimiter.RateLimiterRegistry;kotlin.String;kotlin.Function1<com.santimattius.resilient.ratelimiter.RateLimiterConfig,kotlin.Unit>){}[0]
+    final fun retry(kotlin/Function1<com.santimattius.resilient.retry/RetryPolicyConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.retry|retry(kotlin.Function1<com.santimattius.resilient.retry.RetryPolicyConfig,kotlin.Unit>){}[0]
+    final fun timeout(kotlin/Function1<com.santimattius.resilient.timeout/TimeoutConfig, kotlin/Unit>) // com.santimattius.resilient.composition/TypedResilientBuilder.timeout|timeout(kotlin.Function1<com.santimattius.resilient.timeout.TimeoutConfig,kotlin.Unit>){}[0]
+}
+
+final class <#A: kotlin/Any?> com.santimattius.resilient.composition/TypedResilientPolicy : kotlin/AutoCloseable { // com.santimattius.resilient.composition/TypedResilientPolicy|null[0]
+    final val cacheHandle // com.santimattius.resilient.composition/TypedResilientPolicy.cacheHandle|{}cacheHandle[0]
+        final fun <get-cacheHandle>(): com.santimattius.resilient.cache/CacheHandle? // com.santimattius.resilient.composition/TypedResilientPolicy.cacheHandle.<get-cacheHandle>|<get-cacheHandle>(){}[0]
+    final val events // com.santimattius.resilient.composition/TypedResilientPolicy.events|{}events[0]
+        final fun <get-events>(): kotlinx.coroutines.flow/SharedFlow<com.santimattius.resilient.telemetry/ResilientEvent> // com.santimattius.resilient.composition/TypedResilientPolicy.events.<get-events>|<get-events>(){}[0]
+
+    final fun close() // com.santimattius.resilient.composition/TypedResilientPolicy.close|close(){}[0]
+    final fun getHealthSnapshot(): com.santimattius.resilient/PolicyHealthSnapshot // com.santimattius.resilient.composition/TypedResilientPolicy.getHealthSnapshot|getHealthSnapshot(){}[0]
+    final fun getKeyedRateLimiterSnapshot(): com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot? // com.santimattius.resilient.composition/TypedResilientPolicy.getKeyedRateLimiterSnapshot|getKeyedRateLimiterSnapshot(){}[0]
+    final suspend fun <#A1: kotlin/Any?> execute(#A, kotlin.coroutines/SuspendFunction1<#A, #A1>): #A1 // com.santimattius.resilient.composition/TypedResilientPolicy.execute|execute(1:0;kotlin.coroutines.SuspendFunction1<1:0,0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class <#A: kotlin/Any?> com.santimattius.resilient.fallback/FallbackConfig { // com.santimattius.resilient.fallback/FallbackConfig|null[0]
+    constructor <init>(kotlin.coroutines/SuspendFunction1<kotlin/Throwable, #A>) // com.santimattius.resilient.fallback/FallbackConfig.<init>|<init>(kotlin.coroutines.SuspendFunction1<kotlin.Throwable,1:0>){}[0]
+
+    final var onFallback // com.santimattius.resilient.fallback/FallbackConfig.onFallback|{}onFallback[0]
+        final fun <get-onFallback>(): kotlin.coroutines/SuspendFunction1<kotlin/Throwable, #A> // com.santimattius.resilient.fallback/FallbackConfig.onFallback.<get-onFallback>|<get-onFallback>(){}[0]
+        final fun <set-onFallback>(kotlin.coroutines/SuspendFunction1<kotlin/Throwable, #A>) // com.santimattius.resilient.fallback/FallbackConfig.onFallback.<set-onFallback>|<set-onFallback>(kotlin.coroutines.SuspendFunction1<kotlin.Throwable,1:0>){}[0]
+}
+
+final class com.santimattius.resilient.bulkhead/BulkheadConfig { // com.santimattius.resilient.bulkhead/BulkheadConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.bulkhead/BulkheadConfig.<init>|<init>(){}[0]
+
+    final var maxConcurrentCalls // com.santimattius.resilient.bulkhead/BulkheadConfig.maxConcurrentCalls|{}maxConcurrentCalls[0]
+        final fun <get-maxConcurrentCalls>(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadConfig.maxConcurrentCalls.<get-maxConcurrentCalls>|<get-maxConcurrentCalls>(){}[0]
+        final fun <set-maxConcurrentCalls>(kotlin/Int) // com.santimattius.resilient.bulkhead/BulkheadConfig.maxConcurrentCalls.<set-maxConcurrentCalls>|<set-maxConcurrentCalls>(kotlin.Int){}[0]
+    final var maxWaitingCalls // com.santimattius.resilient.bulkhead/BulkheadConfig.maxWaitingCalls|{}maxWaitingCalls[0]
+        final fun <get-maxWaitingCalls>(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadConfig.maxWaitingCalls.<get-maxWaitingCalls>|<get-maxWaitingCalls>(){}[0]
+        final fun <set-maxWaitingCalls>(kotlin/Int) // com.santimattius.resilient.bulkhead/BulkheadConfig.maxWaitingCalls.<set-maxWaitingCalls>|<set-maxWaitingCalls>(kotlin.Int){}[0]
+    final var timeout // com.santimattius.resilient.bulkhead/BulkheadConfig.timeout|{}timeout[0]
+        final fun <get-timeout>(): kotlin.time/Duration? // com.santimattius.resilient.bulkhead/BulkheadConfig.timeout.<get-timeout>|<get-timeout>(){}[0]
+        final fun <set-timeout>(kotlin.time/Duration?) // com.santimattius.resilient.bulkhead/BulkheadConfig.timeout.<set-timeout>|<set-timeout>(kotlin.time.Duration?){}[0]
+}
+
+final class com.santimattius.resilient.bulkhead/BulkheadFullException : kotlin/Exception { // com.santimattius.resilient.bulkhead/BulkheadFullException|null[0]
+    constructor <init>() // com.santimattius.resilient.bulkhead/BulkheadFullException.<init>|<init>(){}[0]
+}
+
+final class com.santimattius.resilient.bulkhead/BulkheadRegistry { // com.santimattius.resilient.bulkhead/BulkheadRegistry|null[0]
+    constructor <init>() // com.santimattius.resilient.bulkhead/BulkheadRegistry.<init>|<init>(){}[0]
+
+    final fun getOrCreate(kotlin/String, kotlin/Function1<com.santimattius.resilient.bulkhead/BulkheadConfig, kotlin/Unit>, kotlin/Function1<kotlin/String, kotlin/Unit>? = ...): com.santimattius.resilient.bulkhead/DefaultBulkhead // com.santimattius.resilient.bulkhead/BulkheadRegistry.getOrCreate|getOrCreate(kotlin.String;kotlin.Function1<com.santimattius.resilient.bulkhead.BulkheadConfig,kotlin.Unit>;kotlin.Function1<kotlin.String,kotlin.Unit>?){}[0]
+}
+
+final class com.santimattius.resilient.bulkhead/BulkheadSnapshot { // com.santimattius.resilient.bulkhead/BulkheadSnapshot|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int) // com.santimattius.resilient.bulkhead/BulkheadSnapshot.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+
+    final val activeConcurrentCalls // com.santimattius.resilient.bulkhead/BulkheadSnapshot.activeConcurrentCalls|{}activeConcurrentCalls[0]
+        final fun <get-activeConcurrentCalls>(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadSnapshot.activeConcurrentCalls.<get-activeConcurrentCalls>|<get-activeConcurrentCalls>(){}[0]
+    final val maxConcurrentCalls // com.santimattius.resilient.bulkhead/BulkheadSnapshot.maxConcurrentCalls|{}maxConcurrentCalls[0]
+        final fun <get-maxConcurrentCalls>(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadSnapshot.maxConcurrentCalls.<get-maxConcurrentCalls>|<get-maxConcurrentCalls>(){}[0]
+    final val maxWaitingCalls // com.santimattius.resilient.bulkhead/BulkheadSnapshot.maxWaitingCalls|{}maxWaitingCalls[0]
+        final fun <get-maxWaitingCalls>(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadSnapshot.maxWaitingCalls.<get-maxWaitingCalls>|<get-maxWaitingCalls>(){}[0]
+    final val waitingCalls // com.santimattius.resilient.bulkhead/BulkheadSnapshot.waitingCalls|{}waitingCalls[0]
+        final fun <get-waitingCalls>(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadSnapshot.waitingCalls.<get-waitingCalls>|<get-waitingCalls>(){}[0]
+
+    final fun component1(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadSnapshot.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadSnapshot.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadSnapshot.component3|component3(){}[0]
+    final fun component4(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadSnapshot.component4|component4(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...): com.santimattius.resilient.bulkhead/BulkheadSnapshot // com.santimattius.resilient.bulkhead/BulkheadSnapshot.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.bulkhead/BulkheadSnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.santimattius.resilient.bulkhead/BulkheadSnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.santimattius.resilient.bulkhead/BulkheadSnapshot.toString|toString(){}[0]
+}
+
+final class com.santimattius.resilient.bulkhead/DefaultBulkhead : com.santimattius.resilient.bulkhead/Bulkhead { // com.santimattius.resilient.bulkhead/DefaultBulkhead|null[0]
+    constructor <init>(com.santimattius.resilient.bulkhead/BulkheadConfig, kotlin/Function1<kotlin/String, kotlin/Unit>? = ...) // com.santimattius.resilient.bulkhead/DefaultBulkhead.<init>|<init>(com.santimattius.resilient.bulkhead.BulkheadConfig;kotlin.Function1<kotlin.String,kotlin.Unit>?){}[0]
+
+    final fun snapshot(): com.santimattius.resilient.bulkhead/BulkheadSnapshot // com.santimattius.resilient.bulkhead/DefaultBulkhead.snapshot|snapshot(){}[0]
+    final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.bulkhead/DefaultBulkhead.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class com.santimattius.resilient.cache/CacheConfig { // com.santimattius.resilient.cache/CacheConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.cache/CacheConfig.<init>|<init>(){}[0]
+
+    final var cleanupBatch // com.santimattius.resilient.cache/CacheConfig.cleanupBatch|{}cleanupBatch[0]
+        final fun <get-cleanupBatch>(): kotlin/Int // com.santimattius.resilient.cache/CacheConfig.cleanupBatch.<get-cleanupBatch>|<get-cleanupBatch>(){}[0]
+        final fun <set-cleanupBatch>(kotlin/Int) // com.santimattius.resilient.cache/CacheConfig.cleanupBatch.<set-cleanupBatch>|<set-cleanupBatch>(kotlin.Int){}[0]
+    final var cleanupInterval // com.santimattius.resilient.cache/CacheConfig.cleanupInterval|{}cleanupInterval[0]
+        final fun <get-cleanupInterval>(): kotlin.time/Duration? // com.santimattius.resilient.cache/CacheConfig.cleanupInterval.<get-cleanupInterval>|<get-cleanupInterval>(){}[0]
+        final fun <set-cleanupInterval>(kotlin.time/Duration?) // com.santimattius.resilient.cache/CacheConfig.cleanupInterval.<set-cleanupInterval>|<set-cleanupInterval>(kotlin.time.Duration?){}[0]
+    final var key // com.santimattius.resilient.cache/CacheConfig.key|{}key[0]
+        final fun <get-key>(): kotlin/String // com.santimattius.resilient.cache/CacheConfig.key.<get-key>|<get-key>(){}[0]
+        final fun <set-key>(kotlin/String) // com.santimattius.resilient.cache/CacheConfig.key.<set-key>|<set-key>(kotlin.String){}[0]
+    final var keyProvider // com.santimattius.resilient.cache/CacheConfig.keyProvider|{}keyProvider[0]
+        final fun <get-keyProvider>(): kotlin.coroutines/SuspendFunction0<kotlin/String>? // com.santimattius.resilient.cache/CacheConfig.keyProvider.<get-keyProvider>|<get-keyProvider>(){}[0]
+        final fun <set-keyProvider>(kotlin.coroutines/SuspendFunction0<kotlin/String>?) // com.santimattius.resilient.cache/CacheConfig.keyProvider.<set-keyProvider>|<set-keyProvider>(kotlin.coroutines.SuspendFunction0<kotlin.String>?){}[0]
+    final var ttl // com.santimattius.resilient.cache/CacheConfig.ttl|{}ttl[0]
+        final fun <get-ttl>(): kotlin.time/Duration // com.santimattius.resilient.cache/CacheConfig.ttl.<get-ttl>|<get-ttl>(){}[0]
+        final fun <set-ttl>(kotlin.time/Duration) // com.santimattius.resilient.cache/CacheConfig.ttl.<set-ttl>|<set-ttl>(kotlin.time.Duration){}[0]
+}
+
+final class com.santimattius.resilient.chaos/ChaosConfig { // com.santimattius.resilient.chaos/ChaosConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.chaos/ChaosConfig.<init>|<init>(){}[0]
+
+    final var enabled // com.santimattius.resilient.chaos/ChaosConfig.enabled|{}enabled[0]
+        final fun <get-enabled>(): kotlin/Boolean // com.santimattius.resilient.chaos/ChaosConfig.enabled.<get-enabled>|<get-enabled>(){}[0]
+        final fun <set-enabled>(kotlin/Boolean) // com.santimattius.resilient.chaos/ChaosConfig.enabled.<set-enabled>|<set-enabled>(kotlin.Boolean){}[0]
+    final var exception // com.santimattius.resilient.chaos/ChaosConfig.exception|{}exception[0]
+        final fun <get-exception>(): kotlin/Function0<kotlin/Throwable>? // com.santimattius.resilient.chaos/ChaosConfig.exception.<get-exception>|<get-exception>(){}[0]
+        final fun <set-exception>(kotlin/Function0<kotlin/Throwable>?) // com.santimattius.resilient.chaos/ChaosConfig.exception.<set-exception>|<set-exception>(kotlin.Function0<kotlin.Throwable>?){}[0]
+    final var failureRate // com.santimattius.resilient.chaos/ChaosConfig.failureRate|{}failureRate[0]
+        final fun <get-failureRate>(): kotlin/Double // com.santimattius.resilient.chaos/ChaosConfig.failureRate.<get-failureRate>|<get-failureRate>(){}[0]
+        final fun <set-failureRate>(kotlin/Double) // com.santimattius.resilient.chaos/ChaosConfig.failureRate.<set-failureRate>|<set-failureRate>(kotlin.Double){}[0]
+    final var injectResult // com.santimattius.resilient.chaos/ChaosConfig.injectResult|{}injectResult[0]
+        final fun <get-injectResult>(): kotlin/Function0<kotlin/Any?>? // com.santimattius.resilient.chaos/ChaosConfig.injectResult.<get-injectResult>|<get-injectResult>(){}[0]
+        final fun <set-injectResult>(kotlin/Function0<kotlin/Any?>?) // com.santimattius.resilient.chaos/ChaosConfig.injectResult.<set-injectResult>|<set-injectResult>(kotlin.Function0<kotlin.Any?>?){}[0]
+    final var latency // com.santimattius.resilient.chaos/ChaosConfig.latency|{}latency[0]
+        final fun <get-latency>(): kotlin.time/Duration? // com.santimattius.resilient.chaos/ChaosConfig.latency.<get-latency>|<get-latency>(){}[0]
+        final fun <set-latency>(kotlin.time/Duration?) // com.santimattius.resilient.chaos/ChaosConfig.latency.<set-latency>|<set-latency>(kotlin.time.Duration?){}[0]
+}
+
+final class com.santimattius.resilient.chaos/DefaultChaosPolicy { // com.santimattius.resilient.chaos/DefaultChaosPolicy|null[0]
+    constructor <init>(com.santimattius.resilient.chaos/ChaosConfig) // com.santimattius.resilient.chaos/DefaultChaosPolicy.<init>|<init>(com.santimattius.resilient.chaos.ChaosConfig){}[0]
+
+    final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.chaos/DefaultChaosPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig { // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.<init>|<init>(){}[0]
+
+    final var failureRateThreshold // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.failureRateThreshold|{}failureRateThreshold[0]
+        final fun <get-failureRateThreshold>(): kotlin/Double? // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.failureRateThreshold.<get-failureRateThreshold>|<get-failureRateThreshold>(){}[0]
+        final fun <set-failureRateThreshold>(kotlin/Double?) // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.failureRateThreshold.<set-failureRateThreshold>|<set-failureRateThreshold>(kotlin.Double?){}[0]
+    final var failureThreshold // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.failureThreshold|{}failureThreshold[0]
+        final fun <get-failureThreshold>(): kotlin/Int // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.failureThreshold.<get-failureThreshold>|<get-failureThreshold>(){}[0]
+        final fun <set-failureThreshold>(kotlin/Int) // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.failureThreshold.<set-failureThreshold>|<set-failureThreshold>(kotlin.Int){}[0]
+    final var halfOpenMaxCalls // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.halfOpenMaxCalls|{}halfOpenMaxCalls[0]
+        final fun <get-halfOpenMaxCalls>(): kotlin/Int // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.halfOpenMaxCalls.<get-halfOpenMaxCalls>|<get-halfOpenMaxCalls>(){}[0]
+        final fun <set-halfOpenMaxCalls>(kotlin/Int) // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.halfOpenMaxCalls.<set-halfOpenMaxCalls>|<set-halfOpenMaxCalls>(kotlin.Int){}[0]
+    final var minimumNumberOfCalls // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.minimumNumberOfCalls|{}minimumNumberOfCalls[0]
+        final fun <get-minimumNumberOfCalls>(): kotlin/Int // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.minimumNumberOfCalls.<get-minimumNumberOfCalls>|<get-minimumNumberOfCalls>(){}[0]
+        final fun <set-minimumNumberOfCalls>(kotlin/Int) // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.minimumNumberOfCalls.<set-minimumNumberOfCalls>|<set-minimumNumberOfCalls>(kotlin.Int){}[0]
+    final var onStateChange // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.onStateChange|{}onStateChange[0]
+        final fun <get-onStateChange>(): kotlin/Function1<com.santimattius.resilient.circuitbreaker/CircuitState, kotlin/Unit> // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.onStateChange.<get-onStateChange>|<get-onStateChange>(){}[0]
+        final fun <set-onStateChange>(kotlin/Function1<com.santimattius.resilient.circuitbreaker/CircuitState, kotlin/Unit>) // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.onStateChange.<set-onStateChange>|<set-onStateChange>(kotlin.Function1<com.santimattius.resilient.circuitbreaker.CircuitState,kotlin.Unit>){}[0]
+    final var shouldRecordFailure // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.shouldRecordFailure|{}shouldRecordFailure[0]
+        final fun <get-shouldRecordFailure>(): kotlin/Function1<kotlin/Throwable, kotlin/Boolean> // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.shouldRecordFailure.<get-shouldRecordFailure>|<get-shouldRecordFailure>(){}[0]
+        final fun <set-shouldRecordFailure>(kotlin/Function1<kotlin/Throwable, kotlin/Boolean>) // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.shouldRecordFailure.<set-shouldRecordFailure>|<set-shouldRecordFailure>(kotlin.Function1<kotlin.Throwable,kotlin.Boolean>){}[0]
+    final var shouldRecordResult // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.shouldRecordResult|{}shouldRecordResult[0]
+        final fun <get-shouldRecordResult>(): kotlin/Function1<kotlin/Any?, kotlin/Boolean>? // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.shouldRecordResult.<get-shouldRecordResult>|<get-shouldRecordResult>(){}[0]
+        final fun <set-shouldRecordResult>(kotlin/Function1<kotlin/Any?, kotlin/Boolean>?) // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.shouldRecordResult.<set-shouldRecordResult>|<set-shouldRecordResult>(kotlin.Function1<kotlin.Any?,kotlin.Boolean>?){}[0]
+    final var slidingWindow // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.slidingWindow|{}slidingWindow[0]
+        final fun <get-slidingWindow>(): kotlin.time/Duration? // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.slidingWindow.<get-slidingWindow>|<get-slidingWindow>(){}[0]
+        final fun <set-slidingWindow>(kotlin.time/Duration?) // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.slidingWindow.<set-slidingWindow>|<set-slidingWindow>(kotlin.time.Duration?){}[0]
+    final var successThreshold // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.successThreshold|{}successThreshold[0]
+        final fun <get-successThreshold>(): kotlin/Int // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.successThreshold.<get-successThreshold>|<get-successThreshold>(){}[0]
+        final fun <set-successThreshold>(kotlin/Int) // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.successThreshold.<set-successThreshold>|<set-successThreshold>(kotlin.Int){}[0]
+    final var timeout // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.timeout|{}timeout[0]
+        final fun <get-timeout>(): kotlin.time/Duration // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.timeout.<get-timeout>|<get-timeout>(){}[0]
+        final fun <set-timeout>(kotlin.time/Duration) // com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig.timeout.<set-timeout>|<set-timeout>(kotlin.time.Duration){}[0]
+}
+
+final class com.santimattius.resilient.circuitbreaker/CircuitBreakerOpenException : kotlin/Exception { // com.santimattius.resilient.circuitbreaker/CircuitBreakerOpenException|null[0]
+    constructor <init>(com.santimattius.resilient.circuitbreaker/CircuitState, kotlin.time/Duration?) // com.santimattius.resilient.circuitbreaker/CircuitBreakerOpenException.<init>|<init>(com.santimattius.resilient.circuitbreaker.CircuitState;kotlin.time.Duration?){}[0]
+
+    final val currentState // com.santimattius.resilient.circuitbreaker/CircuitBreakerOpenException.currentState|{}currentState[0]
+        final fun <get-currentState>(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.circuitbreaker/CircuitBreakerOpenException.currentState.<get-currentState>|<get-currentState>(){}[0]
+    final val retryAfter // com.santimattius.resilient.circuitbreaker/CircuitBreakerOpenException.retryAfter|{}retryAfter[0]
+        final fun <get-retryAfter>(): kotlin.time/Duration? // com.santimattius.resilient.circuitbreaker/CircuitBreakerOpenException.retryAfter.<get-retryAfter>|<get-retryAfter>(){}[0]
+}
+
+final class com.santimattius.resilient.circuitbreaker/CircuitBreakerRegistry { // com.santimattius.resilient.circuitbreaker/CircuitBreakerRegistry|null[0]
+    constructor <init>() // com.santimattius.resilient.circuitbreaker/CircuitBreakerRegistry.<init>|<init>(){}[0]
+
+    final fun getOrCreate(kotlin/String, kotlin/Function1<com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig, kotlin/Unit>, kotlin/Function2<com.santimattius.resilient.circuitbreaker/CircuitState, com.santimattius.resilient.circuitbreaker/CircuitState, kotlin/Unit>? = ...): com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker // com.santimattius.resilient.circuitbreaker/CircuitBreakerRegistry.getOrCreate|getOrCreate(kotlin.String;kotlin.Function1<com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig,kotlin.Unit>;kotlin.Function2<com.santimattius.resilient.circuitbreaker.CircuitState,com.santimattius.resilient.circuitbreaker.CircuitState,kotlin.Unit>?){}[0]
+}
+
+final class com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot { // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot|null[0]
+    constructor <init>(com.santimattius.resilient.circuitbreaker/CircuitState, kotlin/Int, kotlin/Int) // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.<init>|<init>(com.santimattius.resilient.circuitbreaker.CircuitState;kotlin.Int;kotlin.Int){}[0]
+
+    final val failureCount // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.failureCount|{}failureCount[0]
+        final fun <get-failureCount>(): kotlin/Int // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.failureCount.<get-failureCount>|<get-failureCount>(){}[0]
+    final val state // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.state|{}state[0]
+        final fun <get-state>(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.state.<get-state>|<get-state>(){}[0]
+    final val successCount // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.successCount|{}successCount[0]
+        final fun <get-successCount>(): kotlin/Int // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.successCount.<get-successCount>|<get-successCount>(){}[0]
+
+    final fun component1(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.component3|component3(){}[0]
+    final fun copy(com.santimattius.resilient.circuitbreaker/CircuitState = ..., kotlin/Int = ..., kotlin/Int = ...): com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.copy|copy(com.santimattius.resilient.circuitbreaker.CircuitState;kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.toString|toString(){}[0]
+}
+
+final class com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker : com.santimattius.resilient.circuitbreaker/CircuitBreaker { // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker|null[0]
+    constructor <init>(com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig, com.santimattius.resilient.circuitbreaker/TimeSource = ..., kotlin/Function2<com.santimattius.resilient.circuitbreaker/CircuitState, com.santimattius.resilient.circuitbreaker/CircuitState, kotlin/Unit> = ...) // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.<init>|<init>(com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig;com.santimattius.resilient.circuitbreaker.TimeSource;kotlin.Function2<com.santimattius.resilient.circuitbreaker.CircuitState,com.santimattius.resilient.circuitbreaker.CircuitState,kotlin.Unit>){}[0]
+
+    final val state // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.santimattius.resilient.circuitbreaker/CircuitState> // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.state.<get-state>|<get-state>(){}[0]
+
+    final fun snapshot(): com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.snapshot|snapshot(){}[0]
+    final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class com.santimattius.resilient.coalescing/CoalesceConfig { // com.santimattius.resilient.coalescing/CoalesceConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.coalescing/CoalesceConfig.<init>|<init>(){}[0]
+
+    final var key // com.santimattius.resilient.coalescing/CoalesceConfig.key|{}key[0]
+        final fun <get-key>(): kotlin/String // com.santimattius.resilient.coalescing/CoalesceConfig.key.<get-key>|<get-key>(){}[0]
+        final fun <set-key>(kotlin/String) // com.santimattius.resilient.coalescing/CoalesceConfig.key.<set-key>|<set-key>(kotlin.String){}[0]
+    final var keyProvider // com.santimattius.resilient.coalescing/CoalesceConfig.keyProvider|{}keyProvider[0]
+        final fun <get-keyProvider>(): kotlin.coroutines/SuspendFunction0<kotlin/String>? // com.santimattius.resilient.coalescing/CoalesceConfig.keyProvider.<get-keyProvider>|<get-keyProvider>(){}[0]
+        final fun <set-keyProvider>(kotlin.coroutines/SuspendFunction0<kotlin/String>?) // com.santimattius.resilient.coalescing/CoalesceConfig.keyProvider.<set-keyProvider>|<set-keyProvider>(kotlin.coroutines.SuspendFunction0<kotlin.String>?){}[0]
+}
+
+final class com.santimattius.resilient.coalescing/DefaultCoalescingPolicy : com.santimattius.resilient.coalescing/CoalescingPolicy { // com.santimattius.resilient.coalescing/DefaultCoalescingPolicy|null[0]
+    constructor <init>(com.santimattius.resilient.coalescing/CoalesceConfig, com.santimattius.resilient.composition/ResilientScope) // com.santimattius.resilient.coalescing/DefaultCoalescingPolicy.<init>|<init>(com.santimattius.resilient.coalescing.CoalesceConfig;com.santimattius.resilient.composition.ResilientScope){}[0]
+
+    final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.coalescing/DefaultCoalescingPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class com.santimattius.resilient.composition/ResilienceTemplate // com.santimattius.resilient.composition/ResilienceTemplate|null[0]
+
+final class com.santimattius.resilient.composition/ResilientBuilder { // com.santimattius.resilient.composition/ResilientBuilder|null[0]
+    constructor <init>() // com.santimattius.resilient.composition/ResilientBuilder.<init>|<init>(){}[0]
+
+    final fun bulkhead(kotlin/Function1<com.santimattius.resilient.bulkhead/BulkheadConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.bulkhead|bulkhead(kotlin.Function1<com.santimattius.resilient.bulkhead.BulkheadConfig,kotlin.Unit>){}[0]
+    final fun bulkheadNamed(com.santimattius.resilient.bulkhead/BulkheadRegistry, kotlin/String, kotlin/Function1<com.santimattius.resilient.bulkhead/BulkheadConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.bulkheadNamed|bulkheadNamed(com.santimattius.resilient.bulkhead.BulkheadRegistry;kotlin.String;kotlin.Function1<com.santimattius.resilient.bulkhead.BulkheadConfig,kotlin.Unit>){}[0]
+    final fun cache(kotlin/Function1<com.santimattius.resilient.cache/CacheConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.cache|cache(kotlin.Function1<com.santimattius.resilient.cache.CacheConfig,kotlin.Unit>){}[0]
+    final fun chaos(kotlin/Function1<com.santimattius.resilient.chaos/ChaosConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.chaos|chaos(kotlin.Function1<com.santimattius.resilient.chaos.ChaosConfig,kotlin.Unit>){}[0]
+    final fun circuitBreaker(kotlin/Function1<com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.circuitBreaker|circuitBreaker(kotlin.Function1<com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig,kotlin.Unit>){}[0]
+    final fun circuitBreakerNamed(com.santimattius.resilient.circuitbreaker/CircuitBreakerRegistry, kotlin/String, kotlin/Function1<com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.circuitBreakerNamed|circuitBreakerNamed(com.santimattius.resilient.circuitbreaker.CircuitBreakerRegistry;kotlin.String;kotlin.Function1<com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig,kotlin.Unit>){}[0]
+    final fun coalesce(kotlin/Function1<com.santimattius.resilient.coalescing/CoalesceConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.coalesce|coalesce(kotlin.Function1<com.santimattius.resilient.coalescing.CoalesceConfig,kotlin.Unit>){}[0]
+    final fun compositionOrder(kotlin.collections/List<com.santimattius.resilient.composition/OrderablePolicyType>) // com.santimattius.resilient.composition/ResilientBuilder.compositionOrder|compositionOrder(kotlin.collections.List<com.santimattius.resilient.composition.OrderablePolicyType>){}[0]
+    final fun fallback(com.santimattius.resilient.fallback/FallbackConfig<kotlin/Any?>) // com.santimattius.resilient.composition/ResilientBuilder.fallback|fallback(com.santimattius.resilient.fallback.FallbackConfig<kotlin.Any?>){}[0]
+    final fun hedging(kotlin/Function1<com.santimattius.resilient.hedging/HedgingConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.hedging|hedging(kotlin.Function1<com.santimattius.resilient.hedging.HedgingConfig,kotlin.Unit>){}[0]
+    final fun include(com.santimattius.resilient.composition/ResilienceTemplate) // com.santimattius.resilient.composition/ResilientBuilder.include|include(com.santimattius.resilient.composition.ResilienceTemplate){}[0]
+    final fun rateLimiter(kotlin/Function1<com.santimattius.resilient.ratelimiter/RateLimiterConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.rateLimiter|rateLimiter(kotlin.Function1<com.santimattius.resilient.ratelimiter.RateLimiterConfig,kotlin.Unit>){}[0]
+    final fun rateLimiterNamed(com.santimattius.resilient.ratelimiter/RateLimiterRegistry, kotlin/String, kotlin/Function1<com.santimattius.resilient.ratelimiter/RateLimiterConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.rateLimiterNamed|rateLimiterNamed(com.santimattius.resilient.ratelimiter.RateLimiterRegistry;kotlin.String;kotlin.Function1<com.santimattius.resilient.ratelimiter.RateLimiterConfig,kotlin.Unit>){}[0]
+    final fun retry(kotlin/Function1<com.santimattius.resilient.retry/RetryPolicyConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.retry|retry(kotlin.Function1<com.santimattius.resilient.retry.RetryPolicyConfig,kotlin.Unit>){}[0]
+    final fun timeout(kotlin/Function1<com.santimattius.resilient.timeout/TimeoutConfig, kotlin/Unit>) // com.santimattius.resilient.composition/ResilientBuilder.timeout|timeout(kotlin.Function1<com.santimattius.resilient.timeout.TimeoutConfig,kotlin.Unit>){}[0]
+}
+
+final class com.santimattius.resilient.composition/ResilientScope : kotlin/AutoCloseable { // com.santimattius.resilient.composition/ResilientScope|null[0]
+    constructor <init>(kotlinx.coroutines/CoroutineDispatcher = ...) // com.santimattius.resilient.composition/ResilientScope.<init>|<init>(kotlinx.coroutines.CoroutineDispatcher){}[0]
+
+    final fun <#A1: kotlin/Any?> async(kotlin.coroutines/CoroutineContext = ..., kotlinx.coroutines/CoroutineStart = ..., kotlin.coroutines/SuspendFunction1<kotlinx.coroutines/CoroutineScope, #A1>): kotlinx.coroutines/Deferred<#A1> // com.santimattius.resilient.composition/ResilientScope.async|async(kotlin.coroutines.CoroutineContext;kotlinx.coroutines.CoroutineStart;kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope,0:0>){0§<kotlin.Any?>}[0]
+    final fun close() // com.santimattius.resilient.composition/ResilientScope.close|close(){}[0]
+    final fun launch(kotlin.coroutines/CoroutineContext = ..., kotlinx.coroutines/CoroutineStart = ..., kotlin.coroutines/SuspendFunction1<kotlinx.coroutines/CoroutineScope, kotlin/Unit>): kotlinx.coroutines/Job // com.santimattius.resilient.composition/ResilientScope.launch|launch(kotlin.coroutines.CoroutineContext;kotlinx.coroutines.CoroutineStart;kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope,kotlin.Unit>){}[0]
+}
+
+final class com.santimattius.resilient.deadline/ResilientDeadline : kotlin.coroutines/AbstractCoroutineContextElement { // com.santimattius.resilient.deadline/ResilientDeadline|null[0]
+    constructor <init>(kotlin.time/TimeMark) // com.santimattius.resilient.deadline/ResilientDeadline.<init>|<init>(kotlin.time.TimeMark){}[0]
+
+    final val deadline // com.santimattius.resilient.deadline/ResilientDeadline.deadline|{}deadline[0]
+        final fun <get-deadline>(): kotlin.time/TimeMark // com.santimattius.resilient.deadline/ResilientDeadline.deadline.<get-deadline>|<get-deadline>(){}[0]
+
+    final fun remaining(): kotlin.time/Duration // com.santimattius.resilient.deadline/ResilientDeadline.remaining|remaining(){}[0]
+
+    final object Key : kotlin.coroutines/CoroutineContext.Key<com.santimattius.resilient.deadline/ResilientDeadline> { // com.santimattius.resilient.deadline/ResilientDeadline.Key|null[0]
+        final fun after(kotlin.time/Duration): com.santimattius.resilient.deadline/ResilientDeadline // com.santimattius.resilient.deadline/ResilientDeadline.Key.after|after(kotlin.time.Duration){}[0]
+    }
+}
+
+final class com.santimattius.resilient.fallback/FallbackPolicy { // com.santimattius.resilient.fallback/FallbackPolicy|null[0]
+    constructor <init>(com.santimattius.resilient.fallback/FallbackConfig<kotlin/Any?>, kotlin/Function1<kotlin/Throwable, kotlin/Unit> = ...) // com.santimattius.resilient.fallback/FallbackPolicy.<init>|<init>(com.santimattius.resilient.fallback.FallbackConfig<kotlin.Any?>;kotlin.Function1<kotlin.Throwable,kotlin.Unit>){}[0]
+
+    final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.fallback/FallbackPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class com.santimattius.resilient.hedging/DefaultHedgingPolicy : com.santimattius.resilient.hedging/HedgingPolicy { // com.santimattius.resilient.hedging/DefaultHedgingPolicy|null[0]
+    constructor <init>(com.santimattius.resilient.hedging/HedgingConfig, kotlin/Function1<kotlin/Int, kotlin/Unit> = ...) // com.santimattius.resilient.hedging/DefaultHedgingPolicy.<init>|<init>(com.santimattius.resilient.hedging.HedgingConfig;kotlin.Function1<kotlin.Int,kotlin.Unit>){}[0]
+
+    final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.hedging/DefaultHedgingPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class com.santimattius.resilient.hedging/HedgingConfig { // com.santimattius.resilient.hedging/HedgingConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.hedging/HedgingConfig.<init>|<init>(){}[0]
+
+    final var attempts // com.santimattius.resilient.hedging/HedgingConfig.attempts|{}attempts[0]
+        final fun <get-attempts>(): kotlin/Int // com.santimattius.resilient.hedging/HedgingConfig.attempts.<get-attempts>|<get-attempts>(){}[0]
+        final fun <set-attempts>(kotlin/Int) // com.santimattius.resilient.hedging/HedgingConfig.attempts.<set-attempts>|<set-attempts>(kotlin.Int){}[0]
+    final var stagger // com.santimattius.resilient.hedging/HedgingConfig.stagger|{}stagger[0]
+        final fun <get-stagger>(): kotlin.time/Duration // com.santimattius.resilient.hedging/HedgingConfig.stagger.<get-stagger>|<get-stagger>(){}[0]
+        final fun <set-stagger>(kotlin.time/Duration) // com.santimattius.resilient.hedging/HedgingConfig.stagger.<set-stagger>|<set-stagger>(kotlin.time.Duration){}[0]
+}
+
+final class com.santimattius.resilient.ratelimiter/DefaultRateLimiter : com.santimattius.resilient.ratelimiter/RateLimiter { // com.santimattius.resilient.ratelimiter/DefaultRateLimiter|null[0]
+    constructor <init>(com.santimattius.resilient.ratelimiter/RateLimiterConfig, kotlin.coroutines/SuspendFunction1<kotlin.time/Duration, kotlin/Unit> = ..., com.santimattius.resilient.circuitbreaker/TimeSource = ...) // com.santimattius.resilient.ratelimiter/DefaultRateLimiter.<init>|<init>(com.santimattius.resilient.ratelimiter.RateLimiterConfig;kotlin.coroutines.SuspendFunction1<kotlin.time.Duration,kotlin.Unit>;com.santimattius.resilient.circuitbreaker.TimeSource){}[0]
+
+    final fun snapshot(): com.santimattius.resilient/RateLimiterSnapshot // com.santimattius.resilient.ratelimiter/DefaultRateLimiter.snapshot|snapshot(){}[0]
+    final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.ratelimiter/DefaultRateLimiter.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class com.santimattius.resilient.ratelimiter/KeyedRateLimiterCapacityExceededException : kotlin/Exception { // com.santimattius.resilient.ratelimiter/KeyedRateLimiterCapacityExceededException|null[0]
+    constructor <init>() // com.santimattius.resilient.ratelimiter/KeyedRateLimiterCapacityExceededException.<init>|<init>(){}[0]
+}
+
+final class com.santimattius.resilient.ratelimiter/KeyedRateLimiterRegistry { // com.santimattius.resilient.ratelimiter/KeyedRateLimiterRegistry|null[0]
+    constructor <init>() // com.santimattius.resilient.ratelimiter/KeyedRateLimiterRegistry.<init>|<init>(){}[0]
+
+    final fun <#A1: kotlin/Any?, #B1: kotlin/Any?> getOrCreate(kotlin/String, kotlin/Function1<com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig<#A1, #B1>, kotlin/Unit>, kotlin.coroutines/SuspendFunction0<kotlin/Unit>? = ...): com.santimattius.resilient.ratelimiter/KeyedRateLimiter<#A1, #B1> // com.santimattius.resilient.ratelimiter/KeyedRateLimiterRegistry.getOrCreate|getOrCreate(kotlin.String;kotlin.Function1<com.santimattius.resilient.ratelimiter.KeyedRateLimiterConfig<0:0,0:1>,kotlin.Unit>;kotlin.coroutines.SuspendFunction0<kotlin.Unit>?){0§<kotlin.Any?>;1§<kotlin.Any?>}[0]
+}
+
+final class com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot { // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int) // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+    final val maxBuckets // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.maxBuckets|{}maxBuckets[0]
+        final fun <get-maxBuckets>(): kotlin/Int // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.maxBuckets.<get-maxBuckets>|<get-maxBuckets>(){}[0]
+    final val residentBuckets // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.residentBuckets|{}residentBuckets[0]
+        final fun <get-residentBuckets>(): kotlin/Int // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.residentBuckets.<get-residentBuckets>|<get-residentBuckets>(){}[0]
+
+    final fun component1(): kotlin/Int // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ...): com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.copy|copy(kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.santimattius.resilient.ratelimiter/KeyedRateLimiterSnapshot.toString|toString(){}[0]
+}
+
+final class com.santimattius.resilient.ratelimiter/RateLimitExceededException : kotlin/Exception { // com.santimattius.resilient.ratelimiter/RateLimitExceededException|null[0]
+    constructor <init>(kotlin.time/Duration?) // com.santimattius.resilient.ratelimiter/RateLimitExceededException.<init>|<init>(kotlin.time.Duration?){}[0]
+
+    final val retryAfter // com.santimattius.resilient.ratelimiter/RateLimitExceededException.retryAfter|{}retryAfter[0]
+        final fun <get-retryAfter>(): kotlin.time/Duration? // com.santimattius.resilient.ratelimiter/RateLimitExceededException.retryAfter.<get-retryAfter>|<get-retryAfter>(){}[0]
+}
+
+final class com.santimattius.resilient.ratelimiter/RateLimiterConfig { // com.santimattius.resilient.ratelimiter/RateLimiterConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.ratelimiter/RateLimiterConfig.<init>|<init>(){}[0]
+
+    final var maxCalls // com.santimattius.resilient.ratelimiter/RateLimiterConfig.maxCalls|{}maxCalls[0]
+        final fun <get-maxCalls>(): kotlin/Int // com.santimattius.resilient.ratelimiter/RateLimiterConfig.maxCalls.<get-maxCalls>|<get-maxCalls>(){}[0]
+        final fun <set-maxCalls>(kotlin/Int) // com.santimattius.resilient.ratelimiter/RateLimiterConfig.maxCalls.<set-maxCalls>|<set-maxCalls>(kotlin.Int){}[0]
+    final var onRateLimited // com.santimattius.resilient.ratelimiter/RateLimiterConfig.onRateLimited|{}onRateLimited[0]
+        final fun <get-onRateLimited>(): kotlin.coroutines/SuspendFunction0<kotlin/Unit> // com.santimattius.resilient.ratelimiter/RateLimiterConfig.onRateLimited.<get-onRateLimited>|<get-onRateLimited>(){}[0]
+        final fun <set-onRateLimited>(kotlin.coroutines/SuspendFunction0<kotlin/Unit>) // com.santimattius.resilient.ratelimiter/RateLimiterConfig.onRateLimited.<set-onRateLimited>|<set-onRateLimited>(kotlin.coroutines.SuspendFunction0<kotlin.Unit>){}[0]
+    final var period // com.santimattius.resilient.ratelimiter/RateLimiterConfig.period|{}period[0]
+        final fun <get-period>(): kotlin.time/Duration // com.santimattius.resilient.ratelimiter/RateLimiterConfig.period.<get-period>|<get-period>(){}[0]
+        final fun <set-period>(kotlin.time/Duration) // com.santimattius.resilient.ratelimiter/RateLimiterConfig.period.<set-period>|<set-period>(kotlin.time.Duration){}[0]
+    final var timeoutWhenLimited // com.santimattius.resilient.ratelimiter/RateLimiterConfig.timeoutWhenLimited|{}timeoutWhenLimited[0]
+        final fun <get-timeoutWhenLimited>(): kotlin.time/Duration? // com.santimattius.resilient.ratelimiter/RateLimiterConfig.timeoutWhenLimited.<get-timeoutWhenLimited>|<get-timeoutWhenLimited>(){}[0]
+        final fun <set-timeoutWhenLimited>(kotlin.time/Duration?) // com.santimattius.resilient.ratelimiter/RateLimiterConfig.timeoutWhenLimited.<set-timeoutWhenLimited>|<set-timeoutWhenLimited>(kotlin.time.Duration?){}[0]
+}
+
+final class com.santimattius.resilient.ratelimiter/RateLimiterRegistry { // com.santimattius.resilient.ratelimiter/RateLimiterRegistry|null[0]
+    constructor <init>() // com.santimattius.resilient.ratelimiter/RateLimiterRegistry.<init>|<init>(){}[0]
+
+    final fun getOrCreate(kotlin/String, kotlin/Function1<com.santimattius.resilient.ratelimiter/RateLimiterConfig, kotlin/Unit>, kotlin.coroutines/SuspendFunction1<kotlin.time/Duration, kotlin/Unit>? = ...): com.santimattius.resilient.ratelimiter/DefaultRateLimiter // com.santimattius.resilient.ratelimiter/RateLimiterRegistry.getOrCreate|getOrCreate(kotlin.String;kotlin.Function1<com.santimattius.resilient.ratelimiter.RateLimiterConfig,kotlin.Unit>;kotlin.coroutines.SuspendFunction1<kotlin.time.Duration,kotlin.Unit>?){}[0]
+}
+
+final class com.santimattius.resilient.retry/DecorrelatedJitterBackoff : com.santimattius.resilient.retry/BackoffStrategy { // com.santimattius.resilient.retry/DecorrelatedJitterBackoff|null[0]
+    constructor <init>(kotlin.time/Duration, kotlin.time/Duration) // com.santimattius.resilient.retry/DecorrelatedJitterBackoff.<init>|<init>(kotlin.time.Duration;kotlin.time.Duration){}[0]
+
+    final val base // com.santimattius.resilient.retry/DecorrelatedJitterBackoff.base|{}base[0]
+        final fun <get-base>(): kotlin.time/Duration // com.santimattius.resilient.retry/DecorrelatedJitterBackoff.base.<get-base>|<get-base>(){}[0]
+    final val cap // com.santimattius.resilient.retry/DecorrelatedJitterBackoff.cap|{}cap[0]
+        final fun <get-cap>(): kotlin.time/Duration // com.santimattius.resilient.retry/DecorrelatedJitterBackoff.cap.<get-cap>|<get-cap>(){}[0]
+
+    final suspend fun delay(kotlin/Int) // com.santimattius.resilient.retry/DecorrelatedJitterBackoff.delay|delay(kotlin.Int){}[0]
+}
+
+final class com.santimattius.resilient.retry/DefaultRetryPolicy : com.santimattius.resilient.retry/RetryPolicy { // com.santimattius.resilient.retry/DefaultRetryPolicy|null[0]
+    constructor <init>(com.santimattius.resilient.retry/RetryPolicyConfig) // com.santimattius.resilient.retry/DefaultRetryPolicy.<init>|<init>(com.santimattius.resilient.retry.RetryPolicyConfig){}[0]
+
+    final fun snapshot(): com.santimattius.resilient/RetrySnapshot // com.santimattius.resilient.retry/DefaultRetryPolicy.snapshot|snapshot(){}[0]
+    final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.retry/DefaultRetryPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class com.santimattius.resilient.retry/ExponentialBackoff : com.santimattius.resilient.retry/BackoffStrategy { // com.santimattius.resilient.retry/ExponentialBackoff|null[0]
+    constructor <init>(kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin/Double = ..., kotlin/Boolean = ...) // com.santimattius.resilient.retry/ExponentialBackoff.<init>|<init>(kotlin.time.Duration;kotlin.time.Duration;kotlin.Double;kotlin.Boolean){}[0]
+
+    final val factor // com.santimattius.resilient.retry/ExponentialBackoff.factor|{}factor[0]
+        final fun <get-factor>(): kotlin/Double // com.santimattius.resilient.retry/ExponentialBackoff.factor.<get-factor>|<get-factor>(){}[0]
+    final val initialDelay // com.santimattius.resilient.retry/ExponentialBackoff.initialDelay|{}initialDelay[0]
+        final fun <get-initialDelay>(): kotlin.time/Duration // com.santimattius.resilient.retry/ExponentialBackoff.initialDelay.<get-initialDelay>|<get-initialDelay>(){}[0]
+    final val jitter // com.santimattius.resilient.retry/ExponentialBackoff.jitter|{}jitter[0]
+        final fun <get-jitter>(): kotlin/Boolean // com.santimattius.resilient.retry/ExponentialBackoff.jitter.<get-jitter>|<get-jitter>(){}[0]
+    final val maxDelay // com.santimattius.resilient.retry/ExponentialBackoff.maxDelay|{}maxDelay[0]
+        final fun <get-maxDelay>(): kotlin.time/Duration // com.santimattius.resilient.retry/ExponentialBackoff.maxDelay.<get-maxDelay>|<get-maxDelay>(){}[0]
+
+    final suspend fun delay(kotlin/Int) // com.santimattius.resilient.retry/ExponentialBackoff.delay|delay(kotlin.Int){}[0]
+}
+
+final class com.santimattius.resilient.retry/FixedBackoff : com.santimattius.resilient.retry/BackoffStrategy { // com.santimattius.resilient.retry/FixedBackoff|null[0]
+    constructor <init>(kotlin.time/Duration = ...) // com.santimattius.resilient.retry/FixedBackoff.<init>|<init>(kotlin.time.Duration){}[0]
+
+    final val delay // com.santimattius.resilient.retry/FixedBackoff.delay|{}delay[0]
+        final fun <get-delay>(): kotlin.time/Duration // com.santimattius.resilient.retry/FixedBackoff.delay.<get-delay>|<get-delay>(){}[0]
+
+    final suspend fun delay(kotlin/Int) // com.santimattius.resilient.retry/FixedBackoff.delay|delay(kotlin.Int){}[0]
+}
+
+final class com.santimattius.resilient.retry/LinearBackoff : com.santimattius.resilient.retry/BackoffStrategy { // com.santimattius.resilient.retry/LinearBackoff|null[0]
+    constructor <init>(kotlin.time/Duration = ...) // com.santimattius.resilient.retry/LinearBackoff.<init>|<init>(kotlin.time.Duration){}[0]
+
+    final val delay // com.santimattius.resilient.retry/LinearBackoff.delay|{}delay[0]
+        final fun <get-delay>(): kotlin.time/Duration // com.santimattius.resilient.retry/LinearBackoff.delay.<get-delay>|<get-delay>(){}[0]
+
+    final suspend fun delay(kotlin/Int) // com.santimattius.resilient.retry/LinearBackoff.delay|delay(kotlin.Int){}[0]
+}
+
+final class com.santimattius.resilient.retry/RetryPolicyConfig { // com.santimattius.resilient.retry/RetryPolicyConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.retry/RetryPolicyConfig.<init>|<init>(){}[0]
+
+    final var backoffStrategy // com.santimattius.resilient.retry/RetryPolicyConfig.backoffStrategy|{}backoffStrategy[0]
+        final fun <get-backoffStrategy>(): com.santimattius.resilient.retry/BackoffStrategy // com.santimattius.resilient.retry/RetryPolicyConfig.backoffStrategy.<get-backoffStrategy>|<get-backoffStrategy>(){}[0]
+        final fun <set-backoffStrategy>(com.santimattius.resilient.retry/BackoffStrategy) // com.santimattius.resilient.retry/RetryPolicyConfig.backoffStrategy.<set-backoffStrategy>|<set-backoffStrategy>(com.santimattius.resilient.retry.BackoffStrategy){}[0]
+    final var maxAttempts // com.santimattius.resilient.retry/RetryPolicyConfig.maxAttempts|{}maxAttempts[0]
+        final fun <get-maxAttempts>(): kotlin/Int // com.santimattius.resilient.retry/RetryPolicyConfig.maxAttempts.<get-maxAttempts>|<get-maxAttempts>(){}[0]
+        final fun <set-maxAttempts>(kotlin/Int) // com.santimattius.resilient.retry/RetryPolicyConfig.maxAttempts.<set-maxAttempts>|<set-maxAttempts>(kotlin.Int){}[0]
+    final var onRetry // com.santimattius.resilient.retry/RetryPolicyConfig.onRetry|{}onRetry[0]
+        final fun <get-onRetry>(): kotlin.coroutines/SuspendFunction2<kotlin/Int, kotlin/Throwable, kotlin/Unit> // com.santimattius.resilient.retry/RetryPolicyConfig.onRetry.<get-onRetry>|<get-onRetry>(){}[0]
+        final fun <set-onRetry>(kotlin.coroutines/SuspendFunction2<kotlin/Int, kotlin/Throwable, kotlin/Unit>) // com.santimattius.resilient.retry/RetryPolicyConfig.onRetry.<set-onRetry>|<set-onRetry>(kotlin.coroutines.SuspendFunction2<kotlin.Int,kotlin.Throwable,kotlin.Unit>){}[0]
+    final var perAttemptTimeout // com.santimattius.resilient.retry/RetryPolicyConfig.perAttemptTimeout|{}perAttemptTimeout[0]
+        final fun <get-perAttemptTimeout>(): kotlin.time/Duration? // com.santimattius.resilient.retry/RetryPolicyConfig.perAttemptTimeout.<get-perAttemptTimeout>|<get-perAttemptTimeout>(){}[0]
+        final fun <set-perAttemptTimeout>(kotlin.time/Duration?) // com.santimattius.resilient.retry/RetryPolicyConfig.perAttemptTimeout.<set-perAttemptTimeout>|<set-perAttemptTimeout>(kotlin.time.Duration?){}[0]
+    final var shouldRetry // com.santimattius.resilient.retry/RetryPolicyConfig.shouldRetry|{}shouldRetry[0]
+        final fun <get-shouldRetry>(): kotlin/Function1<kotlin/Throwable, kotlin/Boolean> // com.santimattius.resilient.retry/RetryPolicyConfig.shouldRetry.<get-shouldRetry>|<get-shouldRetry>(){}[0]
+        final fun <set-shouldRetry>(kotlin/Function1<kotlin/Throwable, kotlin/Boolean>) // com.santimattius.resilient.retry/RetryPolicyConfig.shouldRetry.<set-shouldRetry>|<set-shouldRetry>(kotlin.Function1<kotlin.Throwable,kotlin.Boolean>){}[0]
+    final var shouldRetryResult // com.santimattius.resilient.retry/RetryPolicyConfig.shouldRetryResult|{}shouldRetryResult[0]
+        final fun <get-shouldRetryResult>(): kotlin/Function1<kotlin/Any?, kotlin/Boolean>? // com.santimattius.resilient.retry/RetryPolicyConfig.shouldRetryResult.<get-shouldRetryResult>|<get-shouldRetryResult>(){}[0]
+        final fun <set-shouldRetryResult>(kotlin/Function1<kotlin/Any?, kotlin/Boolean>?) // com.santimattius.resilient.retry/RetryPolicyConfig.shouldRetryResult.<set-shouldRetryResult>|<set-shouldRetryResult>(kotlin.Function1<kotlin.Any?,kotlin.Boolean>?){}[0]
+}
+
+final class com.santimattius.resilient.retry/RetryableResultException : kotlin/Exception { // com.santimattius.resilient.retry/RetryableResultException|null[0]
+    constructor <init>(kotlin/String = ..., kotlin/Any? = ...) // com.santimattius.resilient.retry/RetryableResultException.<init>|<init>(kotlin.String;kotlin.Any?){}[0]
+
+    final val lastValue // com.santimattius.resilient.retry/RetryableResultException.lastValue|{}lastValue[0]
+        final fun <get-lastValue>(): kotlin/Any? // com.santimattius.resilient.retry/RetryableResultException.lastValue.<get-lastValue>|<get-lastValue>(){}[0]
+}
+
+final class com.santimattius.resilient.timeout/DefaultTimeoutPolicy : com.santimattius.resilient.timeout/TimeoutPolicy { // com.santimattius.resilient.timeout/DefaultTimeoutPolicy|null[0]
+    constructor <init>(com.santimattius.resilient.timeout/TimeoutConfig) // com.santimattius.resilient.timeout/DefaultTimeoutPolicy.<init>|<init>(com.santimattius.resilient.timeout.TimeoutConfig){}[0]
+
+    final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.timeout/DefaultTimeoutPolicy.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
+}
+
+final class com.santimattius.resilient.timeout/TimeoutConfig { // com.santimattius.resilient.timeout/TimeoutConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.timeout/TimeoutConfig.<init>|<init>(){}[0]
+
+    final var onTimeout // com.santimattius.resilient.timeout/TimeoutConfig.onTimeout|{}onTimeout[0]
+        final fun <get-onTimeout>(): kotlin.coroutines/SuspendFunction0<kotlin/Unit> // com.santimattius.resilient.timeout/TimeoutConfig.onTimeout.<get-onTimeout>|<get-onTimeout>(){}[0]
+        final fun <set-onTimeout>(kotlin.coroutines/SuspendFunction0<kotlin/Unit>) // com.santimattius.resilient.timeout/TimeoutConfig.onTimeout.<set-onTimeout>|<set-onTimeout>(kotlin.coroutines.SuspendFunction0<kotlin.Unit>){}[0]
+    final var timeout // com.santimattius.resilient.timeout/TimeoutConfig.timeout|{}timeout[0]
+        final fun <get-timeout>(): kotlin.time/Duration // com.santimattius.resilient.timeout/TimeoutConfig.timeout.<get-timeout>|<get-timeout>(){}[0]
+        final fun <set-timeout>(kotlin.time/Duration) // com.santimattius.resilient.timeout/TimeoutConfig.timeout.<set-timeout>|<set-timeout>(kotlin.time.Duration){}[0]
+}
+
+final class com.santimattius.resilient/CacheSnapshot { // com.santimattius.resilient/CacheSnapshot|null[0]
+    constructor <init>(kotlin/Int, kotlin/Double) // com.santimattius.resilient/CacheSnapshot.<init>|<init>(kotlin.Int;kotlin.Double){}[0]
+
+    final val entryCount // com.santimattius.resilient/CacheSnapshot.entryCount|{}entryCount[0]
+        final fun <get-entryCount>(): kotlin/Int // com.santimattius.resilient/CacheSnapshot.entryCount.<get-entryCount>|<get-entryCount>(){}[0]
+    final val hitRate // com.santimattius.resilient/CacheSnapshot.hitRate|{}hitRate[0]
+        final fun <get-hitRate>(): kotlin/Double // com.santimattius.resilient/CacheSnapshot.hitRate.<get-hitRate>|<get-hitRate>(){}[0]
+
+    final fun component1(): kotlin/Int // com.santimattius.resilient/CacheSnapshot.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // com.santimattius.resilient/CacheSnapshot.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Double = ...): com.santimattius.resilient/CacheSnapshot // com.santimattius.resilient/CacheSnapshot.copy|copy(kotlin.Int;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient/CacheSnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.santimattius.resilient/CacheSnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.santimattius.resilient/CacheSnapshot.toString|toString(){}[0]
+}
+
+final class com.santimattius.resilient/PolicyHealthSnapshot { // com.santimattius.resilient/PolicyHealthSnapshot|null[0]
+    constructor <init>(com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot? = ..., com.santimattius.resilient.bulkhead/BulkheadSnapshot? = ..., com.santimattius.resilient/RateLimiterSnapshot? = ..., com.santimattius.resilient/RetrySnapshot? = ..., com.santimattius.resilient/CacheSnapshot? = ...) // com.santimattius.resilient/PolicyHealthSnapshot.<init>|<init>(com.santimattius.resilient.circuitbreaker.CircuitBreakerSnapshot?;com.santimattius.resilient.bulkhead.BulkheadSnapshot?;com.santimattius.resilient.RateLimiterSnapshot?;com.santimattius.resilient.RetrySnapshot?;com.santimattius.resilient.CacheSnapshot?){}[0]
+
+    final val bulkhead // com.santimattius.resilient/PolicyHealthSnapshot.bulkhead|{}bulkhead[0]
+        final fun <get-bulkhead>(): com.santimattius.resilient.bulkhead/BulkheadSnapshot? // com.santimattius.resilient/PolicyHealthSnapshot.bulkhead.<get-bulkhead>|<get-bulkhead>(){}[0]
+    final val cache // com.santimattius.resilient/PolicyHealthSnapshot.cache|{}cache[0]
+        final fun <get-cache>(): com.santimattius.resilient/CacheSnapshot? // com.santimattius.resilient/PolicyHealthSnapshot.cache.<get-cache>|<get-cache>(){}[0]
+    final val circuitBreaker // com.santimattius.resilient/PolicyHealthSnapshot.circuitBreaker|{}circuitBreaker[0]
+        final fun <get-circuitBreaker>(): com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot? // com.santimattius.resilient/PolicyHealthSnapshot.circuitBreaker.<get-circuitBreaker>|<get-circuitBreaker>(){}[0]
+    final val rateLimiter // com.santimattius.resilient/PolicyHealthSnapshot.rateLimiter|{}rateLimiter[0]
+        final fun <get-rateLimiter>(): com.santimattius.resilient/RateLimiterSnapshot? // com.santimattius.resilient/PolicyHealthSnapshot.rateLimiter.<get-rateLimiter>|<get-rateLimiter>(){}[0]
+    final val retry // com.santimattius.resilient/PolicyHealthSnapshot.retry|{}retry[0]
+        final fun <get-retry>(): com.santimattius.resilient/RetrySnapshot? // com.santimattius.resilient/PolicyHealthSnapshot.retry.<get-retry>|<get-retry>(){}[0]
+
+    final fun component1(): com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot? // com.santimattius.resilient/PolicyHealthSnapshot.component1|component1(){}[0]
+    final fun component2(): com.santimattius.resilient.bulkhead/BulkheadSnapshot? // com.santimattius.resilient/PolicyHealthSnapshot.component2|component2(){}[0]
+    final fun component3(): com.santimattius.resilient/RateLimiterSnapshot? // com.santimattius.resilient/PolicyHealthSnapshot.component3|component3(){}[0]
+    final fun component4(): com.santimattius.resilient/RetrySnapshot? // com.santimattius.resilient/PolicyHealthSnapshot.component4|component4(){}[0]
+    final fun component5(): com.santimattius.resilient/CacheSnapshot? // com.santimattius.resilient/PolicyHealthSnapshot.component5|component5(){}[0]
+    final fun copy(com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot? = ..., com.santimattius.resilient.bulkhead/BulkheadSnapshot? = ..., com.santimattius.resilient/RateLimiterSnapshot? = ..., com.santimattius.resilient/RetrySnapshot? = ..., com.santimattius.resilient/CacheSnapshot? = ...): com.santimattius.resilient/PolicyHealthSnapshot // com.santimattius.resilient/PolicyHealthSnapshot.copy|copy(com.santimattius.resilient.circuitbreaker.CircuitBreakerSnapshot?;com.santimattius.resilient.bulkhead.BulkheadSnapshot?;com.santimattius.resilient.RateLimiterSnapshot?;com.santimattius.resilient.RetrySnapshot?;com.santimattius.resilient.CacheSnapshot?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient/PolicyHealthSnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.santimattius.resilient/PolicyHealthSnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.santimattius.resilient/PolicyHealthSnapshot.toString|toString(){}[0]
+}
+
+final class com.santimattius.resilient/RateLimiterSnapshot { // com.santimattius.resilient/RateLimiterSnapshot|null[0]
+    constructor <init>(kotlin/Int, kotlin.time/Duration) // com.santimattius.resilient/RateLimiterSnapshot.<init>|<init>(kotlin.Int;kotlin.time.Duration){}[0]
+
+    final val remainingCalls // com.santimattius.resilient/RateLimiterSnapshot.remainingCalls|{}remainingCalls[0]
+        final fun <get-remainingCalls>(): kotlin/Int // com.santimattius.resilient/RateLimiterSnapshot.remainingCalls.<get-remainingCalls>|<get-remainingCalls>(){}[0]
+    final val timeToRefill // com.santimattius.resilient/RateLimiterSnapshot.timeToRefill|{}timeToRefill[0]
+        final fun <get-timeToRefill>(): kotlin.time/Duration // com.santimattius.resilient/RateLimiterSnapshot.timeToRefill.<get-timeToRefill>|<get-timeToRefill>(){}[0]
+
+    final fun component1(): kotlin/Int // com.santimattius.resilient/RateLimiterSnapshot.component1|component1(){}[0]
+    final fun component2(): kotlin.time/Duration // com.santimattius.resilient/RateLimiterSnapshot.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin.time/Duration = ...): com.santimattius.resilient/RateLimiterSnapshot // com.santimattius.resilient/RateLimiterSnapshot.copy|copy(kotlin.Int;kotlin.time.Duration){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient/RateLimiterSnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.santimattius.resilient/RateLimiterSnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.santimattius.resilient/RateLimiterSnapshot.toString|toString(){}[0]
+}
+
+final class com.santimattius.resilient/RetrySnapshot { // com.santimattius.resilient/RetrySnapshot|null[0]
+    constructor <init>(kotlin/Int) // com.santimattius.resilient/RetrySnapshot.<init>|<init>(kotlin.Int){}[0]
+
+    final val maxAttempts // com.santimattius.resilient/RetrySnapshot.maxAttempts|{}maxAttempts[0]
+        final fun <get-maxAttempts>(): kotlin/Int // com.santimattius.resilient/RetrySnapshot.maxAttempts.<get-maxAttempts>|<get-maxAttempts>(){}[0]
+
+    final fun component1(): kotlin/Int // com.santimattius.resilient/RetrySnapshot.component1|component1(){}[0]
+    final fun copy(kotlin/Int = ...): com.santimattius.resilient/RetrySnapshot // com.santimattius.resilient/RetrySnapshot.copy|copy(kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient/RetrySnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.santimattius.resilient/RetrySnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.santimattius.resilient/RetrySnapshot.toString|toString(){}[0]
+}
+
+final object com.santimattius.resilient.circuitbreaker/SystemTimeSource : com.santimattius.resilient.circuitbreaker/TimeSource { // com.santimattius.resilient.circuitbreaker/SystemTimeSource|null[0]
+    final fun currentTimeMillis(): kotlin/Long // com.santimattius.resilient.circuitbreaker/SystemTimeSource.currentTimeMillis|currentTimeMillis(){}[0]
+}
+
+final fun (kotlinx.coroutines/CoroutineScope).com.santimattius.resilient.composition/asResilientScope(): com.santimattius.resilient.composition/ResilientScope // com.santimattius.resilient.composition/asResilientScope|asResilientScope@kotlinx.coroutines.CoroutineScope(){}[0]
+final fun (kotlinx.coroutines/CoroutineScope).com.santimattius.resilient.composition/resilient(kotlin/Function1<com.santimattius.resilient.composition/ResilientBuilder, kotlin/Unit>): com.santimattius.resilient/ResilientPolicy // com.santimattius.resilient.composition/resilient|resilient@kotlinx.coroutines.CoroutineScope(kotlin.Function1<com.santimattius.resilient.composition.ResilientBuilder,kotlin.Unit>){}[0]
+final fun <#A: kotlin/Any?, #B: kotlin/Any?> com.santimattius.resilient.ratelimiter/keyedRateLimiter(kotlin/Function1<com.santimattius.resilient.ratelimiter/KeyedRateLimiterConfig<#A, #B>, kotlin/Unit>): com.santimattius.resilient.ratelimiter/KeyedRateLimiter<#A, #B> // com.santimattius.resilient.ratelimiter/keyedRateLimiter|keyedRateLimiter(kotlin.Function1<com.santimattius.resilient.ratelimiter.KeyedRateLimiterConfig<0:0,0:1>,kotlin.Unit>){0§<kotlin.Any?>;1§<kotlin.Any?>}[0]
+final fun <#A: kotlin/Any?> (kotlinx.coroutines/CoroutineScope).com.santimattius.resilient.composition/resilientFor(kotlin/Function1<com.santimattius.resilient.composition/TypedResilientBuilder<#A>, kotlin/Unit>): com.santimattius.resilient.composition/TypedResilientPolicy<#A> // com.santimattius.resilient.composition/resilientFor|resilientFor@kotlinx.coroutines.CoroutineScope(kotlin.Function1<com.santimattius.resilient.composition.TypedResilientBuilder<0:0>,kotlin.Unit>){0§<kotlin.Any?>}[0]
+final fun <#A: kotlin/Any?> com.santimattius.resilient.composition/resilientFor(com.santimattius.resilient.composition/ResilientScope, kotlin/Function1<com.santimattius.resilient.composition/TypedResilientBuilder<#A>, kotlin/Unit>): com.santimattius.resilient.composition/TypedResilientPolicy<#A> // com.santimattius.resilient.composition/resilientFor|resilientFor(com.santimattius.resilient.composition.ResilientScope;kotlin.Function1<com.santimattius.resilient.composition.TypedResilientBuilder<0:0>,kotlin.Unit>){0§<kotlin.Any?>}[0]
+final fun com.santimattius.resilient.composition/resilienceTemplate(kotlin/Function1<com.santimattius.resilient.composition/ResilientBuilder, kotlin/Unit>): com.santimattius.resilient.composition/ResilienceTemplate // com.santimattius.resilient.composition/resilienceTemplate|resilienceTemplate(kotlin.Function1<com.santimattius.resilient.composition.ResilientBuilder,kotlin.Unit>){}[0]
+final fun com.santimattius.resilient.composition/resilient(com.santimattius.resilient.composition/ResilientScope, kotlin/Function1<com.santimattius.resilient.composition/ResilientBuilder, kotlin/Unit>): com.santimattius.resilient/ResilientPolicy // com.santimattius.resilient.composition/resilient|resilient(com.santimattius.resilient.composition.ResilientScope;kotlin.Function1<com.santimattius.resilient.composition.ResilientBuilder,kotlin.Unit>){}[0]

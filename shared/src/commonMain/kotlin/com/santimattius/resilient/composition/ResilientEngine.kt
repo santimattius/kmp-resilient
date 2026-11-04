@@ -51,7 +51,9 @@ import kotlin.time.TimeSource
 internal class ResilientEngine(
     private val builder: ResilientBuilder,
     resilientScope: ResilientScope,
-    keyedRateLimiterFactory: (((suspend () -> Unit) -> KeyedRateLimiter<Any?, *>))? = null
+    keyedRateLimiterFactory: (((suspend () -> Unit) -> KeyedRateLimiter<Any?, *>))? = null,
+    private val cacheKeyFor: ((Any?) -> String)? = null,
+    private val coalesceKeyFor: ((Any?) -> String)? = null
 ) {
     private val events = MutableSharedFlow<ResilientEvent>(extraBufferCapacity = 10)
     val eventFlow: SharedFlow<ResilientEvent> get() = events.asSharedFlow()
@@ -235,6 +237,17 @@ internal class ResilientEngine(
         block = block
     )
 
+    // Typed policies derive the key from the execution input; legacy policies use the static config.
+    private fun <T> cached(policy: InMemoryCachePolicy, input: Any?, next: Execute<T>): Execute<T> {
+        val keyFor = cacheKeyFor ?: return { policy.execute { next() } }
+        return { policy.executeWithKey(keyFor(input), redactEvents = true) { next() } }
+    }
+
+    private fun <T> coalesced(policy: DefaultCoalescingPolicy, input: Any?, next: Execute<T>): Execute<T> {
+        val keyFor = coalesceKeyFor ?: return { policy.execute { next() } }
+        return { policy.executeWithKey(keyFor(input)) { next() } }
+    }
+
     @OptIn(ResilientExperimentalApi::class)
     private fun <T> compose(
         input: Any?,
@@ -262,11 +275,11 @@ internal class ResilientEngine(
                     }
 
                     PolicyType.CACHE -> cache?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        { next: Execute<T> -> cached(policy, input, next) }
                     }
 
                     PolicyType.COALESCE -> coalescing?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        { next: Execute<T> -> coalesced(policy, input, next) }
                     }
 
                     PolicyType.TIMEOUT -> timeoutPolicy?.let { policy ->
@@ -312,8 +325,8 @@ internal class ResilientEngine(
                 if (circuitBreaker != null) add { next -> { circuitBreaker.execute { next() } } }
                 if (retry != null) add { next -> { retry.execute { next() } } }
                 if (timeout != null) add { next -> { timeout.execute { next() } } }
-                if (coalescing != null) add { next -> { coalescing.execute { next() } } }
-                if (cache != null) add { next -> { cache.execute { next() } } }
+                if (coalescing != null) add { next -> coalesced(coalescing, input, next) }
+                if (cache != null) add { next -> cached(cache, input, next) }
                 if (fallback != null) add { next -> { fallback.execute { next() } } }
             }
         }
