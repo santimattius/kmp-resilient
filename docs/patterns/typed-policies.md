@@ -85,6 +85,51 @@ compositionOrder(listOf(OrderablePolicyType.KEYED_RATE_LIMITER, OrderablePolicyT
 - Rate limiting by key emits the keyless `ResilientEvent.KeyedRateLimited`.
 - Raw input and derived keys never appear in events, snapshots or exception messages (including `KeyedRateLimiterCapacityExceededException`). If you need key grouping in metrics, use an approved bounded or hashed dimension.
 
+## Migrating from nested `execute` calls
+
+Before typed policies, combining a global limiter with a keyed one meant wrapping one `execute` call in another (see [Rate Limiter](rate-limiter.md#keyed-rate-limiter)):
+
+```kotlin
+// Before: two standalone limiters, composition order fixed by the nesting
+val global = DefaultRateLimiter(RateLimiterConfig().apply { maxCalls = 500; period = 1.seconds })
+val perTenant = keyedRateLimiter<Request, String> {
+    keyProvider = { it.tenant }
+    maxCalls = 20
+    period = 1.seconds
+}
+
+suspend fun search(request: Request): List<Result> =
+    global.execute {
+        perTenant.execute(request) { api.search(request) }
+    }
+```
+
+The same behavior as one declarative policy:
+
+```kotlin
+// After: one pipeline, one execute call
+val searchPolicy = resilientFor<Request>(scope) {
+    rateLimiter { maxCalls = 500; period = 1.seconds }
+    keyedRateLimiter<String> {
+        keyProvider = { it.tenant }
+        maxCalls = 20
+        period = 1.seconds
+    }
+}
+
+suspend fun search(request: Request): List<Result> =
+    searchPolicy.execute(request) { api.search(request) }
+```
+
+Migration notes:
+
+- **Type arguments:** the standalone `keyedRateLimiter<Request, String>` takes the input and key types; inside `resilientFor<Request>` the input type is already known, so only the key type is declared.
+- **Order:** the nesting above consumes global quota first. The default typed order does the same (global outside keyed). To reverse it, use `compositionOrder(...)` instead of swapping the nesting.
+- **Shared quotas:** a limiter shared by several call sites becomes a named registry entry (`rateLimiterNamed`, `keyedRateLimiterNamed`). Building the policy twice from an ordinary `rateLimiter { }` or `keyedRateLimiter { }` creates independent quotas.
+- **Observability:** the pipeline emits one operation success/failure event per execution and exposes separate snapshots (`getHealthSnapshot().rateLimiter` and `getKeyedRateLimiterSnapshot()`).
+- **Lifecycle:** `close()` releases state owned by the policy; registry-owned state survives.
+- **Compatibility:** existing standalone limiters and `resilient { }` keep working unchanged; migrate call sites incrementally.
+
 ## See also
 
 - [Rate Limiter](rate-limiter.md#keyed-rate-limiter)
