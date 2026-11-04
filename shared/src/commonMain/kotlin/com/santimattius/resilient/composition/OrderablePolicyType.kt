@@ -19,6 +19,11 @@ enum class OrderablePolicyType {
     CIRCUIT_BREAKER,
     /** Rate limiter: limits the rate of executions. */
     RATE_LIMITER,
+    /**
+     * Keyed rate limiter: per-key quotas derived from the typed input of
+     * [TypedResilientPolicy]; ignored by policies without a keyed limiter.
+     */
+    KEYED_RATE_LIMITER,
     /** Bulkhead: limits concurrent executions. */
     BULKHEAD,
     /** Hedging: runs multiple parallel attempts and returns the first success. */

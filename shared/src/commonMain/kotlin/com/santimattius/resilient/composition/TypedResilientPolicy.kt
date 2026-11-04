@@ -12,6 +12,10 @@ import com.santimattius.resilient.circuitbreaker.CircuitBreakerRegistry
 import com.santimattius.resilient.coalescing.CoalesceConfig
 import com.santimattius.resilient.fallback.FallbackConfig
 import com.santimattius.resilient.hedging.HedgingConfig
+import com.santimattius.resilient.ratelimiter.KeyedRateLimiter
+import com.santimattius.resilient.ratelimiter.KeyedRateLimiterConfig
+import com.santimattius.resilient.ratelimiter.KeyedRateLimiterRegistry
+import com.santimattius.resilient.ratelimiter.KeyedRateLimiterSnapshot
 import com.santimattius.resilient.ratelimiter.RateLimiterConfig
 import com.santimattius.resilient.ratelimiter.RateLimiterRegistry
 import com.santimattius.resilient.retry.RetryPolicyConfig
@@ -54,11 +58,18 @@ class TypedResilientPolicy<Input> internal constructor(
     fun getHealthSnapshot(): PolicyHealthSnapshot = engine.healthSnapshot()
 
     /**
+     * Returns a privacy-safe snapshot of the keyed rate limiter (aggregate counts only, never keys
+     * or input), or `null` when no keyed rate limiter is configured. The global rate limiter is
+     * reported separately by [getHealthSnapshot].
+     */
+    fun getKeyedRateLimiterSnapshot(): KeyedRateLimiterSnapshot? = engine.keyedRateLimiterSnapshot()
+
+    /**
      * Executes [block] with [input] under the configured resilience policies.
      * The same [input] is passed to every attempt of [block].
      */
     suspend fun <T> execute(input: Input, block: suspend (Input) -> T): T =
-        engine.execute { block(input) }
+        engine.execute(input) { block(input) }
 
     /**
      * Releases policy-owned resources (for example the cache). Registry-owned state and the
@@ -74,6 +85,9 @@ class TypedResilientPolicy<Input> internal constructor(
 @OptIn(ResilientExperimentalApi::class)
 class TypedResilientBuilder<Input> internal constructor() {
     internal val delegate = ResilientBuilder()
+    internal var cacheKeyFor: ((Input) -> String)? = null
+    internal var coalesceKeyFor: ((Input) -> String)? = null
+    internal var keyedRateLimiterFactory: ((suspend () -> Unit) -> KeyedRateLimiter<Input, *>)? = null
 
     /** @see ResilientBuilder.retry */
     fun retry(config: RetryPolicyConfig.() -> Unit) = delegate.retry(config)
@@ -98,6 +112,50 @@ class TypedResilientBuilder<Input> internal constructor() {
         configure: RateLimiterConfig.() -> Unit
     ) = delegate.rateLimiterNamed(registry, name, configure)
 
+    /**
+     * Adds a keyed rate limiter whose bucket key is derived from [Input] by
+     * [KeyedRateLimiterConfig.keyProvider]. It composes with the global [rateLimiter] in a single
+     * `execute(input)` call; their relative order is controlled with [compositionOrder] using
+     * [OrderablePolicyType.RATE_LIMITER] and [OrderablePolicyType.KEYED_RATE_LIMITER]
+     * (default: global outside keyed). Neither the input nor the key appears in events, snapshots
+     * or exceptions.
+     *
+     * Keyed configuration is input-typed, so it belongs to the typed builder and cannot be part of
+     * a context-free [ResilienceTemplate]. Cannot be combined with [keyedRateLimiterNamed].
+     */
+    fun <K> keyedRateLimiter(config: KeyedRateLimiterConfig<Input, K>.() -> Unit) {
+        requireKeyedNotConfigured()
+        keyedRateLimiterFactory = { onRateLimited ->
+            val cfg = KeyedRateLimiterConfig<Input, K>().apply(config)
+            val configured = cfg.onRateLimited
+            cfg.onRateLimited = {
+                onRateLimited()
+                configured()
+            }
+            KeyedRateLimiter(cfg)
+        }
+    }
+
+    /**
+     * Like [keyedRateLimiter] but resolves the limiter from [registry] by [name], so its per-key
+     * quotas are shared by every build using the same registry and name. Closing a policy never
+     * destroys registry-owned state. Telemetry is wired only by the build that first creates the entry.
+     */
+    fun <K> keyedRateLimiterNamed(
+        registry: KeyedRateLimiterRegistry,
+        name: String,
+        config: KeyedRateLimiterConfig<Input, K>.() -> Unit
+    ) {
+        requireKeyedNotConfigured()
+        keyedRateLimiterFactory = { onRateLimited -> registry.getOrCreate(name, config, onRateLimited) }
+    }
+
+    private fun requireKeyedNotConfigured() {
+        require(keyedRateLimiterFactory == null) {
+            "A keyed rate limiter can only be configured once per policy; choose keyedRateLimiter or keyedRateLimiterNamed."
+        }
+    }
+
     /** @see ResilientBuilder.bulkhead */
     fun bulkhead(config: BulkheadConfig.() -> Unit) = delegate.bulkhead(config)
 
@@ -113,6 +171,25 @@ class TypedResilientBuilder<Input> internal constructor() {
 
     /** @see ResilientBuilder.coalesce */
     fun coalesce(config: CoalesceConfig.() -> Unit) = delegate.coalesce(config)
+
+    /**
+     * Derives the cache key from the execution [Input]. Required when a [cache] is configured in a
+     * typed policy (directly or through an included [ResilienceTemplate]): building without it
+     * throws, because the static [CacheConfig.key] would make different inputs share one entry.
+     * The derived key is used only internally; cache events report a redacted key.
+     */
+    fun cacheKeyFor(keyFor: (Input) -> String) {
+        cacheKeyFor = keyFor
+    }
+
+    /**
+     * Derives the coalescing key from the execution [Input]. Required when [coalesce] is configured
+     * in a typed policy (directly or through an included template); concurrent executions with the
+     * same key share one in-flight call, different keys run separately.
+     */
+    fun coalesceKeyFor(keyFor: (Input) -> String) {
+        coalesceKeyFor = keyFor
+    }
 
     /** @see ResilientBuilder.fallback */
     fun fallback(config: FallbackConfig<Any?>) = delegate.fallback(config)
@@ -146,7 +223,29 @@ fun <Input> resilientFor(
     block: TypedResilientBuilder<Input>.() -> Unit
 ): TypedResilientPolicy<Input> {
     val builder = TypedResilientBuilder<Input>().apply(block)
-    return TypedResilientPolicy(ResilientEngine(builder.delegate, resilientScope))
+    val delegate = builder.delegate
+    require(delegate.cacheConfig == null || builder.cacheKeyFor != null) {
+        "A typed policy with cache { } must derive the key from its input: call cacheKeyFor { input -> ... } " +
+            "in the resilientFor block. A static key would share one entry across different inputs."
+    }
+    require(delegate.coalesceConfig == null || builder.coalesceKeyFor != null) {
+        "A typed policy with coalesce { } must derive the key from its input: call coalesceKeyFor { input -> ... } " +
+            "in the resilientFor block. A static key would merge in-flight calls of different inputs."
+    }
+    require(builder.cacheKeyFor == null || delegate.cacheConfig != null) {
+        "cacheKeyFor was set but no cache { } is configured."
+    }
+    require(builder.coalesceKeyFor == null || delegate.coalesceConfig != null) {
+        "coalesceKeyFor was set but no coalesce { } is configured."
+    }
+    @Suppress("UNCHECKED_CAST")
+    val cacheKeyFor = builder.cacheKeyFor as ((Any?) -> String)?
+    @Suppress("UNCHECKED_CAST")
+    val coalesceKeyFor = builder.coalesceKeyFor as ((Any?) -> String)?
+    @Suppress("UNCHECKED_CAST")
+    val keyedFactory = builder.keyedRateLimiterFactory
+        as ((suspend () -> Unit) -> KeyedRateLimiter<Any?, *>)?
+    return TypedResilientPolicy(ResilientEngine(builder.delegate, resilientScope, keyedFactory, cacheKeyFor, coalesceKeyFor))
 }
 
 /**
