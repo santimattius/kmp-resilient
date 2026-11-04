@@ -16,7 +16,6 @@ import kotlin.math.min
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-
 /**
  * A default, thread-safe implementation of the [RateLimiter] interface that uses a token-bucket algorithm.
  *
@@ -41,9 +40,8 @@ import kotlin.time.Duration.Companion.milliseconds
 class DefaultRateLimiter(
     private val config: RateLimiterConfig,
     private val onRateLimited: suspend (Duration) -> Unit = {},
-    private val timeSource: TimeSource = SystemTimeSource
+    private val timeSource: TimeSource = SystemTimeSource,
 ) : RateLimiter {
-
     init {
         require(config.maxCalls >= 1) {
             "maxCalls must be >= 1, got ${config.maxCalls}"
@@ -74,23 +72,24 @@ class DefaultRateLimiter(
         val remaining = (periodMs - (elapsed % periodMs)).coerceAtLeast(0)
         return RateLimiterSnapshot(
             remainingCalls = currentTokens.coerceAtLeast(0),
-            timeToRefill = remaining.milliseconds
+            timeToRefill = remaining.milliseconds,
         )
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override suspend fun <T> execute(block: suspend () -> T): T {
         var waitedForRefillAtMs = 0L
-        var waitDuration: Duration? = mutex.withLock {
-            refillTokens()
-            if (tokens > 0) {
-                tokens--
-                null
-            } else {
-                waitedForRefillAtMs = lastRefillMs
-                remainingMillisInWindow().milliseconds
+        var waitDuration: Duration? =
+            mutex.withLock {
+                refillTokens()
+                if (tokens > 0) {
+                    tokens--
+                    null
+                } else {
+                    waitedForRefillAtMs = lastRefillMs
+                    remainingMillisInWindow().milliseconds
+                }
             }
-        }
 
         if (waitDuration != null) {
             onRateLimited(waitDuration)
@@ -100,7 +99,10 @@ class DefaultRateLimiter(
             while (true) {
                 val currentWaitDuration = waitDuration ?: break
                 when (val timeout = remainingTimeout) {
-                    null -> throw RateLimitExceededException(currentWaitDuration)
+                    null -> {
+                        throw RateLimitExceededException(currentWaitDuration)
+                    }
+
                     else -> {
                         if (currentWaitDuration > timeout) {
                             throw RateLimitExceededException(currentWaitDuration)
@@ -117,21 +119,22 @@ class DefaultRateLimiter(
                             delayDeferred.await()
                         }
                         remainingTimeout = timeout - currentWaitDuration
-                        waitDuration = mutex.withLock {
-                            refillTokens()
-                            if (tokens == 0 && lastRefillMs == waitedForRefillAtMs) {
-                                val periodMs = config.period.inWholeMilliseconds
-                                lastRefillMs += periodMs
-                                tokens = min(config.maxCalls, tokens + config.maxCalls)
+                        waitDuration =
+                            mutex.withLock {
+                                refillTokens()
+                                if (tokens == 0 && lastRefillMs == waitedForRefillAtMs) {
+                                    val periodMs = config.period.inWholeMilliseconds
+                                    lastRefillMs += periodMs
+                                    tokens = min(config.maxCalls, tokens + config.maxCalls)
+                                }
+                                if (tokens > 0) {
+                                    tokens--
+                                    null
+                                } else {
+                                    waitedForRefillAtMs = lastRefillMs
+                                    remainingMillisInWindow().milliseconds
+                                }
                             }
-                            if (tokens > 0) {
-                                tokens--
-                                null
-                            } else {
-                                waitedForRefillAtMs = lastRefillMs
-                                remainingMillisInWindow().milliseconds
-                            }
-                        }
                     }
                 }
             }
