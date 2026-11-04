@@ -8,7 +8,7 @@ package com.santimattius.resilient.composition
  * This ensures it can catch all failures from other policies.
  *
  * The default order is:
- * Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → Chaos
+ * Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Keyed Rate Limiter → Bulkhead → Hedging → Chaos
  *
  * This order ensures that:
  * - Fallback wraps outermost to handle failures after all policies (always enforced)
@@ -46,6 +46,7 @@ internal class CompositionOrder(
                 OrderablePolicyType.RETRY -> PolicyType.RETRY
                 OrderablePolicyType.CIRCUIT_BREAKER -> PolicyType.CIRCUIT_BREAKER
                 OrderablePolicyType.RATE_LIMITER -> PolicyType.RATE_LIMITER
+                OrderablePolicyType.KEYED_RATE_LIMITER -> PolicyType.KEYED_RATE_LIMITER
                 OrderablePolicyType.BULKHEAD -> PolicyType.BULKHEAD
                 OrderablePolicyType.HEDGING -> PolicyType.HEDGING
                 OrderablePolicyType.CHAOS -> PolicyType.CHAOS
@@ -61,12 +62,13 @@ internal class CompositionOrder(
             OrderablePolicyType.RETRY,
             OrderablePolicyType.CIRCUIT_BREAKER,
             OrderablePolicyType.RATE_LIMITER,
+            OrderablePolicyType.KEYED_RATE_LIMITER,
             OrderablePolicyType.BULKHEAD,
             OrderablePolicyType.HEDGING,
             OrderablePolicyType.CHAOS
         )
         /**
-         * Default composition order: Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → Chaos
+         * Default composition order: Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Keyed Rate Limiter → Bulkhead → Hedging → Chaos
          */
         val DEFAULT = CompositionOrder(
             listOf(
@@ -76,6 +78,7 @@ internal class CompositionOrder(
                 OrderablePolicyType.RETRY,
                 OrderablePolicyType.CIRCUIT_BREAKER,
                 OrderablePolicyType.RATE_LIMITER,
+                OrderablePolicyType.KEYED_RATE_LIMITER,
                 OrderablePolicyType.BULKHEAD,
                 OrderablePolicyType.HEDGING,
                 OrderablePolicyType.CHAOS

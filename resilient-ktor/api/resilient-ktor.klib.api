@@ -1,0 +1,33 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, iosX64, js, macosArm64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.santimattius.resilient:resilient-ktor>
+final class com.santimattius.resilient.ktor/ResilientPluginConfig { // com.santimattius.resilient.ktor/ResilientPluginConfig|null[0]
+    constructor <init>() // com.santimattius.resilient.ktor/ResilientPluginConfig.<init>|<init>(){}[0]
+
+    final var policy // com.santimattius.resilient.ktor/ResilientPluginConfig.policy|{}policy[0]
+        final fun <get-policy>(): com.santimattius.resilient/ResilientPolicy? // com.santimattius.resilient.ktor/ResilientPluginConfig.policy.<get-policy>|<get-policy>(){}[0]
+        final fun <set-policy>(com.santimattius.resilient/ResilientPolicy?) // com.santimattius.resilient.ktor/ResilientPluginConfig.policy.<set-policy>|<set-policy>(com.santimattius.resilient.ResilientPolicy?){}[0]
+    final var retryOnlyIdempotent // com.santimattius.resilient.ktor/ResilientPluginConfig.retryOnlyIdempotent|{}retryOnlyIdempotent[0]
+        final fun <get-retryOnlyIdempotent>(): kotlin/Boolean // com.santimattius.resilient.ktor/ResilientPluginConfig.retryOnlyIdempotent.<get-retryOnlyIdempotent>|<get-retryOnlyIdempotent>(){}[0]
+        final fun <set-retryOnlyIdempotent>(kotlin/Boolean) // com.santimattius.resilient.ktor/ResilientPluginConfig.retryOnlyIdempotent.<set-retryOnlyIdempotent>|<set-retryOnlyIdempotent>(kotlin.Boolean){}[0]
+    final var scope // com.santimattius.resilient.ktor/ResilientPluginConfig.scope|{}scope[0]
+        final fun <get-scope>(): com.santimattius.resilient.composition/ResilientScope? // com.santimattius.resilient.ktor/ResilientPluginConfig.scope.<get-scope>|<get-scope>(){}[0]
+        final fun <set-scope>(com.santimattius.resilient.composition/ResilientScope?) // com.santimattius.resilient.ktor/ResilientPluginConfig.scope.<set-scope>|<set-scope>(com.santimattius.resilient.composition.ResilientScope?){}[0]
+    final var shouldRetryOnStatus // com.santimattius.resilient.ktor/ResilientPluginConfig.shouldRetryOnStatus|{}shouldRetryOnStatus[0]
+        final fun <get-shouldRetryOnStatus>(): kotlin/Function1<io.ktor.http/HttpStatusCode, kotlin/Boolean> // com.santimattius.resilient.ktor/ResilientPluginConfig.shouldRetryOnStatus.<get-shouldRetryOnStatus>|<get-shouldRetryOnStatus>(){}[0]
+        final fun <set-shouldRetryOnStatus>(kotlin/Function1<io.ktor.http/HttpStatusCode, kotlin/Boolean>) // com.santimattius.resilient.ktor/ResilientPluginConfig.shouldRetryOnStatus.<set-shouldRetryOnStatus>|<set-shouldRetryOnStatus>(kotlin.Function1<io.ktor.http.HttpStatusCode,kotlin.Boolean>){}[0]
+
+    final fun bulkhead(kotlin/Function1<com.santimattius.resilient.bulkhead/BulkheadConfig, kotlin/Unit>) // com.santimattius.resilient.ktor/ResilientPluginConfig.bulkhead|bulkhead(kotlin.Function1<com.santimattius.resilient.bulkhead.BulkheadConfig,kotlin.Unit>){}[0]
+    final fun circuitBreaker(kotlin/Function1<com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig, kotlin/Unit>) // com.santimattius.resilient.ktor/ResilientPluginConfig.circuitBreaker|circuitBreaker(kotlin.Function1<com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig,kotlin.Unit>){}[0]
+    final fun rateLimiter(kotlin/Function1<com.santimattius.resilient.ratelimiter/RateLimiterConfig, kotlin/Unit>) // com.santimattius.resilient.ktor/ResilientPluginConfig.rateLimiter|rateLimiter(kotlin.Function1<com.santimattius.resilient.ratelimiter.RateLimiterConfig,kotlin.Unit>){}[0]
+    final fun retry(kotlin/Function1<com.santimattius.resilient.retry/RetryPolicyConfig, kotlin/Unit>) // com.santimattius.resilient.ktor/ResilientPluginConfig.retry|retry(kotlin.Function1<com.santimattius.resilient.retry.RetryPolicyConfig,kotlin.Unit>){}[0]
+    final fun timeout(kotlin/Function1<com.santimattius.resilient.timeout/TimeoutConfig, kotlin/Unit>) // com.santimattius.resilient.ktor/ResilientPluginConfig.timeout|timeout(kotlin.Function1<com.santimattius.resilient.timeout.TimeoutConfig,kotlin.Unit>){}[0]
+}
+
+final val com.santimattius.resilient.ktor/ResilientPlugin // com.santimattius.resilient.ktor/ResilientPlugin|{}ResilientPlugin[0]
+    final fun <get-ResilientPlugin>(): io.ktor.client.plugins.api/ClientPlugin<com.santimattius.resilient.ktor/ResilientPluginConfig> // com.santimattius.resilient.ktor/ResilientPlugin.<get-ResilientPlugin>|<get-ResilientPlugin>(){}[0]
