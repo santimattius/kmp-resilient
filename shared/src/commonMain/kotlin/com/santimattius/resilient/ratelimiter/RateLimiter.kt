@@ -15,7 +15,7 @@ import kotlin.time.Duration.Companion.seconds
  * Tokens refill by **adding [maxCalls] tokens at the start of each [RateLimiterConfig.period]** (fixed
  * window refill). For example, with maxCalls=10 and period=1s, at most 10 calls per second are allowed;
  * after 1s from the last refill, the bucket is refilled with 10 tokens. This is a per-policy limit
- * (single bucket). For per-key or per-tenant limits, a custom implementation or wrapper would be needed.
+ * (single bucket). For per-key or per-tenant limits, use [KeyedRateLimiter].
  */
 interface RateLimiter {
     /**

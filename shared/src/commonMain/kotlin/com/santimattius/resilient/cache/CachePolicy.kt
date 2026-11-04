@@ -31,6 +31,11 @@ import kotlin.time.ExperimentalTime
  *
  * **Key resolution:** If the config uses [CacheConfig.keyProvider], invoke it at the start of
  * [execute] to get the key for this request; otherwise use [CacheConfig.key].
+ *
+ * **Typed policies:** a policy built with `resilientFor` derives the key from the execution input
+ * through `cacheKeyFor` instead of [CacheConfig.key] or [CacheConfig.keyProvider], and requires it when
+ * a cache is configured. Cache hit/miss events of such a policy report a redacted key, never the
+ * input-derived one.
  */
 interface CachePolicy {
     /**
@@ -71,7 +76,8 @@ interface CacheHandle {
  * (e.g. from request context, user id, or arguments captured in the lambda). If [keyProvider] is
  * set, it is invoked on each [CachePolicy.execute] and its result is used as the cache key;
  * otherwise [key] is used. This allows reusing the same cache policy for multiple logical
- * resources (e.g. `keyProvider = { "user:${userId}" }`).
+ * resources (e.g. `keyProvider = { "user:${userId}" }`). In a typed policy (`resilientFor`) both are
+ * superseded by `cacheKeyFor`, which derives the key from the execution input.
  *
  * @property key The unique identifier for a cache entry when [keyProvider] is null. Defaults to "default".
  * @property keyProvider Optional suspend lambda that returns the cache key at execution time.

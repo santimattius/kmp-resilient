@@ -135,7 +135,8 @@ class ResilientBuilder {
     /**
      * Uses a shared [DefaultCircuitBreaker] from [registry] keyed by [name].
      * Multiple policies can pass the same [CircuitBreakerRegistry] and name to share a **global**
-     * circuit breaker state across those policies.
+     * circuit breaker state across those policies. The registry owns the breaker, so closing a
+     * policy never resets it.
      *
      * **Telemetry limitation:** only the first policy that registers a [name] in the registry will
      * receive [com.santimattius.resilient.telemetry.ResilientEvent.CircuitStateChanged] events via
@@ -174,7 +175,7 @@ class ResilientBuilder {
     /**
      * Uses a shared [DefaultRateLimiter] from [registry] keyed by [name].
      * Multiple policies can pass the same [RateLimiterRegistry] and name to enforce a **global** quota
-     * across those policies.
+     * across those policies. The registry owns the limiter, so closing a policy never resets it.
      *
      * Cannot be combined with [rateLimiter] in the same builder.
      */
@@ -206,7 +207,7 @@ class ResilientBuilder {
     /**
      * Uses a shared [DefaultBulkhead] from [registry] keyed by [name].
      * Multiple policies can pass the same [BulkheadRegistry] and name to enforce a **global** limit
-     * across those policies.
+     * across those policies. The registry owns the bulkhead, so closing a policy never resets it.
      *
      * Cannot be combined with [bulkhead] in the same builder.
      */
@@ -303,6 +304,10 @@ class ResilientBuilder {
      *              Optional: may be empty or a subset. Types in the list are ordered as given; any type not in the list
      *              is appended in the default order. Duplicates are removed.
      *
+     * Calling this more than once, or including a [ResilienceTemplate] that declares an order, replaces
+     * the previous order: the **last explicit order wins**. A typed policy's keyed rate limiter is
+     * ordered with [OrderablePolicyType.KEYED_RATE_LIMITER]; it is ignored when no keyed limiter is configured.
+     *
      * Example:
      * ```kotlin
      * import com.santimattius.resilient.composition.OrderablePolicyType
@@ -322,7 +327,6 @@ class ResilientBuilder {
      * }
      * ```
      */
-
     @ResilientExperimentalApi
     fun compositionOrder(order: List<OrderablePolicyType>) {
         compositionOrder = CompositionOrder(order)
@@ -331,6 +335,8 @@ class ResilientBuilder {
 
     /**
      * Includes a [ResilienceTemplate] into this builder using lexical overlay semantics.
+     * The template is immutable and holds definitions only, so each build that includes it creates its own
+     * runtime state; mutable state is shared only through explicit named registries.
      *
      * - Ordinary configurations are **cloned** from the template and replace any configuration of
      *   the same policy type declared earlier; blocks declared afterwards (for example
@@ -340,6 +346,12 @@ class ResilientBuilder {
      * - If the template declares an explicit [compositionOrder], it replaces the current one;
      *   the last explicit order wins.
      * - Nothing is shared with the template or other builds except explicit registry state.
+     * - Including two templates that configure the same ordinary policy type: the later one replaces
+     *   the earlier one; templates are not merged with each other.
+     *
+     * @param template The template whose definitions are overlaid onto this builder.
+     * @throws IllegalArgumentException if the overlay would duplicate a named policy or combine a named
+     *   policy with its ordinary variant.
      */
     @OptIn(ResilientExperimentalApi::class)
     fun include(template: ResilienceTemplate) {
@@ -407,9 +419,10 @@ class ResilientBuilder {
  * 5. `retry`
  * 6. `circuitBreaker`
  * 7. `rateLimiter`
- * 8. `bulkhead`
- * 9. `hedging`
- * 10. `chaos` (only when [ChaosConfig.enabled] is `true`)
+ * 8. `keyedRateLimiter` (typed policies built with `resilientFor` only)
+ * 9. `bulkhead`
+ * 10. `hedging`
+ * 11. `chaos` (only when [ChaosConfig.enabled] is `true`)
  *
  * This means a request will first pass through the `fallback`, then `cache`, then `coalesce`, and then `timeout`, and so on, until it reaches the core execution block.
  * The `chaos` policy (when enabled) is the innermost wrapper, injecting faults or latency directly around the user block.
@@ -425,6 +438,10 @@ class ResilientBuilder {
  * @param resilientScope The [ResilientScope] in which the policies will operate, typically tied to a coroutine scope.
  * @param block A lambda with a [ResilientBuilder] receiver to configure the desired resilience policies.
  * @return A [ResilientPolicy] instance that can be used to execute operations with the configured policies.
+ *   Each call creates independent runtime state, even when the same [ResilienceTemplate] is included;
+ *   closing the policy never destroys state owned by named registries.
+ * @throws IllegalArgumentException if the configuration is invalid (for example conflicting named and
+ *   ordinary variants of one policy).
  */
 @OptIn(ResilientExperimentalApi::class)
 fun resilient(
