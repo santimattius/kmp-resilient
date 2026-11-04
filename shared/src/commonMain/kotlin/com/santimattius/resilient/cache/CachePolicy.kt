@@ -121,6 +121,11 @@ internal class InMemoryCachePolicy(
 
     private data class Entry(val value: Any?, val expiresAt: Long)
 
+    internal companion object {
+        /** Event key used instead of input-derived keys so caller data never reaches telemetry. */
+        const val REDACTED_KEY = "<input-key>"
+    }
+
     private val store = mutableMapOf<String, Entry>()
     private val ongoing = mutableMapOf<String, Deferred<Any?>>()
     private val mutex = Mutex()
@@ -142,8 +147,21 @@ internal class InMemoryCachePolicy(
     }
 
     @Suppress("UNCHECKED_CAST")
-    override suspend fun <T> execute(block: suspend () -> T): T = coroutineScope {
-        val key = config.keyProvider?.invoke() ?: config.key
+    override suspend fun <T> execute(block: suspend () -> T): T =
+        executeWithKey(config.keyProvider?.invoke() ?: config.key, block = block)
+
+    /**
+     * Runs [block] under an explicit, per-execution [key]. When [redactEvents] is true, hit/miss
+     * telemetry reports [REDACTED_KEY] instead of the key (used by typed policies, whose keys are
+     * derived from caller input).
+     */
+    @Suppress("UNCHECKED_CAST")
+    internal suspend fun <T> executeWithKey(
+        key: String,
+        redactEvents: Boolean = false,
+        block: suspend () -> T
+    ): T = coroutineScope {
+        val eventKey = if (redactEvents) REDACTED_KEY else key
 
         // Single atomic lock: cache check + ongoing dedup.
         // Merging both operations closes the race condition window where a completed
@@ -154,7 +172,7 @@ internal class InMemoryCachePolicy(
             store[key]?.let { entry ->
                 if (now < entry.expiresAt) {
                     hitCount++
-                    onCacheHit?.invoke(key)
+                    onCacheHit?.invoke(eventKey)
                     return@coroutineScope entry.value as T
                 }
                 store.remove(key)
@@ -163,7 +181,7 @@ internal class InMemoryCachePolicy(
             ongoing.getOrPut(key) {
                 missCount++
                 async {
-                    onCacheMiss?.invoke(key)
+                    onCacheMiss?.invoke(eventKey)
                     block()
                 }
             }

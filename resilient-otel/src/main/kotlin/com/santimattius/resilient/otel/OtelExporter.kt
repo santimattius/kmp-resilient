@@ -67,6 +67,9 @@ fun SharedFlow<ResilientEvent>.exportToOpenTelemetry(
         .setDescription("Number of times hedging was used")
         .build()
 
+    val keyedRateLimiterLimitedCounter = meter.counterBuilder("resilient.keyed_rate_limiter.limited")
+        .setDescription("Number of times execution was limited by the keyed rate limiter")
+        .build()
     val fallbackTriggeredCounter = meter.counterBuilder("resilient.fallback.triggered")
         .setDescription("Number of fallback triggers")
         .build()
@@ -77,6 +80,7 @@ fun SharedFlow<ResilientEvent>.exportToOpenTelemetry(
                 is ResilientEvent.RetryAttempt -> retryAttemptsCounter.add(1)
                 is ResilientEvent.CircuitStateChanged -> circuitBreakerStateChangesCounter.add(1)
                 is ResilientEvent.RateLimited -> rateLimiterLimitedCounter.add(1)
+                is ResilientEvent.KeyedRateLimited -> keyedRateLimiterLimitedCounter.add(1)
                 is ResilientEvent.BulkheadRejected -> bulkheadRejectedCounter.add(1)
                 is ResilientEvent.OperationSuccess -> operationSuccessCounter.add(1)
                 is ResilientEvent.OperationFailure -> operationFailureCounter.add(1)

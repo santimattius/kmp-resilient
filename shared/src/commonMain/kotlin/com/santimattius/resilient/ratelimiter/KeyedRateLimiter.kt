@@ -50,6 +50,18 @@ class KeyedRateLimiter<C, K>(
         }
     }
 
+    /**
+     * Returns a privacy-safe, point-in-time view of this limiter: aggregate counts only, never keys.
+     *
+     * The resident count is read without holding the internal lock, so it is an approximation
+     * intended for health checks and dashboards.
+     */
+    fun snapshot(): KeyedRateLimiterSnapshot =
+        KeyedRateLimiterSnapshot(
+            residentBuckets = buckets.size,
+            maxBuckets = settings.maxBuckets,
+        )
+
     private suspend fun acquireBucket(key: K): Bucket =
         mutex.withLock {
             val now = settings.timeSource.currentTimeMillis()
@@ -168,6 +180,19 @@ class KeyedRateLimiterConfig<C, K> {
         )
     }
 }
+
+/**
+ * Point-in-time, privacy-safe snapshot of a [KeyedRateLimiter].
+ *
+ * Contains aggregate counts only; it never carries keys or execution context.
+ *
+ * @property residentBuckets Number of per-key buckets currently resident.
+ * @property maxBuckets Configured upper bound for resident buckets.
+ */
+data class KeyedRateLimiterSnapshot(
+    val residentBuckets: Int,
+    val maxBuckets: Int,
+)
 
 /** Creates a typed [KeyedRateLimiter] from [configure]. */
 fun <C, K> keyedRateLimiter(configure: KeyedRateLimiterConfig<C, K>.() -> Unit): KeyedRateLimiter<C, K> =

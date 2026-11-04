@@ -69,8 +69,12 @@ class DefaultCoalescingPolicy(
     private val mutex = Mutex()
 
     @Suppress("UNCHECKED_CAST")
-    override suspend fun <T> execute(block: suspend () -> T): T = coroutineScope {
-        val key = config.keyProvider?.invoke() ?: config.key
+    override suspend fun <T> execute(block: suspend () -> T): T =
+        executeWithKey(config.keyProvider?.invoke() ?: config.key, block)
+
+    /** Runs [block] coalesced under an explicit, per-execution [key]. */
+    @Suppress("UNCHECKED_CAST")
+    internal suspend fun <T> executeWithKey(key: String, block: suspend () -> T): T = coroutineScope {
 
         val deferred: Deferred<Any?> = mutex.withLock {
             inflight[key]?.let { return@withLock it.deferred }

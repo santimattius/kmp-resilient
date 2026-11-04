@@ -1,0 +1,46 @@
+public final class com/santimattius/resilient/test/FaultInjectedException : java/lang/Exception {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class com/santimattius/resilient/test/FaultInjector {
+	public static final field Companion Lcom/santimattius/resilient/test/FaultInjector$Companion;
+	public synthetic fun <init> (DLkotlin/jvm/functions/Function0;JZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (DLkotlin/jvm/functions/Function0;JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/santimattius/resilient/test/FaultInjector$Builder {
+	public fun <init> ()V
+	public final fun build ()Lcom/santimattius/resilient/test/FaultInjector;
+	public final fun delay-LRDsOJo (J)Lcom/santimattius/resilient/test/FaultInjector$Builder;
+	public final fun delayJitter (Z)Lcom/santimattius/resilient/test/FaultInjector$Builder;
+	public final fun exception (Lkotlin/jvm/functions/Function0;)Lcom/santimattius/resilient/test/FaultInjector$Builder;
+	public final fun failCount (I)Lcom/santimattius/resilient/test/FaultInjector$Builder;
+	public final fun failureRate (D)Lcom/santimattius/resilient/test/FaultInjector$Builder;
+}
+
+public final class com/santimattius/resilient/test/FaultInjector$Companion {
+	public final fun builder ()Lcom/santimattius/resilient/test/FaultInjector$Builder;
+}
+
+public final class com/santimattius/resilient/test/PolicyBuilders {
+	public static final field INSTANCE Lcom/santimattius/resilient/test/PolicyBuilders;
+	public final fun bulkheadPolicy (Lcom/santimattius/resilient/composition/ResilientScope;II)Lcom/santimattius/resilient/ResilientPolicy;
+	public static synthetic fun bulkheadPolicy$default (Lcom/santimattius/resilient/test/PolicyBuilders;Lcom/santimattius/resilient/composition/ResilientScope;IIILjava/lang/Object;)Lcom/santimattius/resilient/ResilientPolicy;
+	public final fun circuitBreakerPolicy-Wn2Vu4Y (Lcom/santimattius/resilient/composition/ResilientScope;IIJ)Lcom/santimattius/resilient/ResilientPolicy;
+	public static synthetic fun circuitBreakerPolicy-Wn2Vu4Y$default (Lcom/santimattius/resilient/test/PolicyBuilders;Lcom/santimattius/resilient/composition/ResilientScope;IIJILjava/lang/Object;)Lcom/santimattius/resilient/ResilientPolicy;
+	public final fun rateLimiterPolicy-SxA4cEA (Lcom/santimattius/resilient/composition/ResilientScope;IJ)Lcom/santimattius/resilient/ResilientPolicy;
+	public static synthetic fun rateLimiterPolicy-SxA4cEA$default (Lcom/santimattius/resilient/test/PolicyBuilders;Lcom/santimattius/resilient/composition/ResilientScope;IJILjava/lang/Object;)Lcom/santimattius/resilient/ResilientPolicy;
+	public final fun retryPolicy-ck1zr5g (Lcom/santimattius/resilient/composition/ResilientScope;IJJLkotlin/jvm/functions/Function1;)Lcom/santimattius/resilient/ResilientPolicy;
+	public static synthetic fun retryPolicy-ck1zr5g$default (Lcom/santimattius/resilient/test/PolicyBuilders;Lcom/santimattius/resilient/composition/ResilientScope;IJJLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/santimattius/resilient/ResilientPolicy;
+	public final fun timeoutPolicy-HG0u8IE (Lcom/santimattius/resilient/composition/ResilientScope;J)Lcom/santimattius/resilient/ResilientPolicy;
+	public static synthetic fun timeoutPolicy-HG0u8IE$default (Lcom/santimattius/resilient/test/PolicyBuilders;Lcom/santimattius/resilient/composition/ResilientScope;JILjava/lang/Object;)Lcom/santimattius/resilient/ResilientPolicy;
+}
+
+public final class com/santimattius/resilient/test/TestResilientScopeKt {
+	public static final fun TestResilientScope (Lkotlinx/coroutines/CoroutineDispatcher;)Lcom/santimattius/resilient/composition/ResilientScope;
+	public static synthetic fun TestResilientScope$default (Lkotlinx/coroutines/CoroutineDispatcher;ILjava/lang/Object;)Lcom/santimattius/resilient/composition/ResilientScope;
+}
+

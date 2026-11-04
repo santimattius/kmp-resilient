@@ -1,0 +1,5 @@
+public final class com/santimattius/resilient/micrometer/MicrometerExporterKt {
+	public static final fun exportToMicrometer (Lkotlinx/coroutines/flow/SharedFlow;Lio/micrometer/core/instrument/MeterRegistry;Lkotlinx/coroutines/CoroutineScope;)Lkotlinx/coroutines/Job;
+	public static synthetic fun exportToMicrometer$default (Lkotlinx/coroutines/flow/SharedFlow;Lio/micrometer/core/instrument/MeterRegistry;Lkotlinx/coroutines/CoroutineScope;ILjava/lang/Object;)Lkotlinx/coroutines/Job;
+}
+

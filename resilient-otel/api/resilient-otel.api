@@ -1,0 +1,5 @@
+public final class com/santimattius/resilient/otel/OtelExporterKt {
+	public static final fun exportToOpenTelemetry (Lkotlinx/coroutines/flow/SharedFlow;Lio/opentelemetry/api/metrics/Meter;Lkotlinx/coroutines/CoroutineScope;)Lkotlinx/coroutines/Job;
+	public static synthetic fun exportToOpenTelemetry$default (Lkotlinx/coroutines/flow/SharedFlow;Lio/opentelemetry/api/metrics/Meter;Lkotlinx/coroutines/CoroutineScope;ILjava/lang/Object;)Lkotlinx/coroutines/Job;
+}
+

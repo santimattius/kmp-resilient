@@ -41,6 +41,14 @@ sealed interface ResilientEvent {
      */
     data class RateLimited(val waitTime: Duration) : ResilientEvent
 
+    /**
+     * Emitted when a typed policy's keyed rate limiter rejects or delays a call.
+     *
+     * Deliberately carries no key and no input: use [RateLimited] for the global limiter and this
+     * event for the keyed one.
+     */
+    data object KeyedRateLimited : ResilientEvent
+
 
     /**
      * Emitted when a call is rejected by the bulkhead due to capacity constraints.
