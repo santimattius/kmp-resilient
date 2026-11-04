@@ -13,6 +13,10 @@ import kotlinx.coroutines.sync.withLock
  * results. It only deduplicates *in-flight* executions: concurrent callers that resolve to the
  * same key will share a single in-flight operation and all await the same [Deferred] result.
  *
+ * In a typed policy (`resilientFor`), the key is derived from the execution input through
+ * `coalesceKeyFor` instead of [CoalesceConfig.key] or [CoalesceConfig.keyProvider]; it is required
+ * when coalescing is configured.
+ *
  * Implementation detail:
  * the shared in-flight operation is launched in the provided [ResilientScope] so cancelling the
  * first caller does not cancel the shared operation needed by other concurrent callers.

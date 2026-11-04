@@ -44,8 +44,9 @@ sealed interface ResilientEvent {
     /**
      * Emitted when a typed policy's keyed rate limiter rejects or delays a call.
      *
-     * Deliberately carries no key and no input: use [RateLimited] for the global limiter and this
-     * event for the keyed one.
+     * Deliberately carries no key and no input, so it cannot be used to tell which key was limited.
+     * Use [RateLimited] for the global limiter and this event for the keyed one; the keyed event
+     * carries no wait time.
      */
     data object KeyedRateLimited : ResilientEvent
 

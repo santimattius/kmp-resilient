@@ -46,6 +46,9 @@ import kotlin.time.TimeSource
  *
  * It owns all runtime state of one build (policies, events) and runs the composed pipeline.
  * Public policies are thin facades over one engine instance; engines are never nested.
+ *
+ * Mutable state is created per engine, so two builds never share it unless it comes from an explicit
+ * named registry; [close] releases only engine-owned resources, never registry-owned state.
  */
 @OptIn(ResilientExperimentalApi::class)
 internal class ResilientEngine(

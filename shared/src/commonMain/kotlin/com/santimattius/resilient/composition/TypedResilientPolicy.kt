@@ -46,15 +46,27 @@ class TypedResilientPolicy<Input> internal constructor(
     private val engine: ResilientEngine
 ) : AutoCloseable {
 
-    /** Operational events of this policy. */
+    /**
+     * Operational events of this policy. Keyed rate limiting is reported as the keyless
+     * [ResilientEvent.KeyedRateLimited]; cache events carry a redacted key. Neither the input nor
+     * an input-derived key is emitted.
+     */
     val events: SharedFlow<ResilientEvent>
         get() = engine.eventFlow
 
-    /** Handle to the policy-owned cache, or `null` when no cache is configured. */
+    /**
+     * Handle to the policy-owned cache, or `null` when no cache is configured.
+     *
+     * Entries are stored under the keys produced by [TypedResilientBuilder.cacheKeyFor], so
+     * invalidation uses those same keys.
+     */
     val cacheHandle: CacheHandle?
         get() = engine.cacheHandle
 
-    /** Returns a point-in-time health snapshot of the configured policies. */
+    /**
+     * Returns a point-in-time health snapshot of the configured policies. It reports the global rate
+     * limiter only; use [getKeyedRateLimiterSnapshot] for the keyed one.
+     */
     fun getHealthSnapshot(): PolicyHealthSnapshot = engine.healthSnapshot()
 
     /**
@@ -66,21 +78,38 @@ class TypedResilientPolicy<Input> internal constructor(
 
     /**
      * Executes [block] with [input] under the configured resilience policies.
-     * The same [input] is passed to every attempt of [block].
+     *
+     * The same [input] is passed to every attempt of [block] (retries, hedged attempts). It is used
+     * to derive the keyed rate limiter, cache and coalescing keys, and is never placed in events,
+     * snapshots or exceptions raised by the library.
+     *
+     * @param input Explicit execution data handed to [block].
+     * @param block The suspendable operation to protect.
+     * @return The result of [block], or the value produced by a cache or fallback policy.
+     * @throws Exception Any failure not handled by the configured policies, as for
+     *   [com.santimattius.resilient.ResilientPolicy.execute]. A keyed limiter at bucket capacity throws
+     *   [com.santimattius.resilient.ratelimiter.KeyedRateLimiterCapacityExceededException].
      */
     suspend fun <T> execute(input: Input, block: suspend (Input) -> T): T =
         engine.execute(input) { block(input) }
 
     /**
-     * Releases policy-owned resources (for example the cache). Registry-owned state and the
-     * outer coroutine scope are not affected.
+     * Releases policy-owned resources (for example the cache cleanup job). State owned by named
+     * registries (rate limiters, circuit breakers, bulkheads, keyed rate limiters) is never destroyed,
+     * and the outer coroutine scope is not cancelled.
      */
     override fun close() = engine.close()
 }
 
 /**
- * DSL receiver of [resilientFor]. Offers the same policy DSL as [ResilientBuilder] and can
- * [include] context-free [ResilienceTemplate]s regardless of [Input].
+ * DSL receiver of [resilientFor]. Offers the same policy DSL as [ResilientBuilder], plus the
+ * input-typed [keyedRateLimiter], [cacheKeyFor] and [coalesceKeyFor], and can [include]
+ * context-free [ResilienceTemplate]s regardless of [Input].
+ *
+ * Template overlay, duplicate named policies and [compositionOrder] follow the rules of
+ * [ResilientBuilder.include].
+ *
+ * @param Input The type of the execution data passed to [TypedResilientPolicy.execute].
  */
 @OptIn(ResilientExperimentalApi::class)
 class TypedResilientBuilder<Input> internal constructor() {
@@ -121,7 +150,12 @@ class TypedResilientBuilder<Input> internal constructor() {
      * or exceptions.
      *
      * Keyed configuration is input-typed, so it belongs to the typed builder and cannot be part of
-     * a context-free [ResilienceTemplate]. Cannot be combined with [keyedRateLimiterNamed].
+     * a context-free [ResilienceTemplate]. Each build creates its own limiter with independent
+     * buckets. Cannot be combined with [keyedRateLimiterNamed], and can be configured only once.
+     *
+     * @param K The type of the bucket key.
+     * @param config Configures the [KeyedRateLimiterConfig]; its `keyProvider` is required.
+     * @throws IllegalArgumentException if a keyed rate limiter was already configured.
      */
     fun <K> keyedRateLimiter(config: KeyedRateLimiterConfig<Input, K>.() -> Unit) {
         requireKeyedNotConfigured()
@@ -139,7 +173,15 @@ class TypedResilientBuilder<Input> internal constructor() {
     /**
      * Like [keyedRateLimiter] but resolves the limiter from [registry] by [name], so its per-key
      * quotas are shared by every build using the same registry and name. Closing a policy never
-     * destroys registry-owned state. Telemetry is wired only by the build that first creates the entry.
+     * destroys registry-owned state. The first build that creates the entry wins: later builds reuse
+     * it and their [config] differences are ignored, and the [ResilientEvent.KeyedRateLimited]
+     * telemetry is wired only by the build that first creates the entry.
+     *
+     * @param K The type of the bucket key; use one name per input/key type.
+     * @param registry The registry that owns the limiter.
+     * @param name The name that identifies the shared limiter within [registry].
+     * @param config Configures the [KeyedRateLimiterConfig] used when the entry is created.
+     * @throws IllegalArgumentException if a keyed rate limiter was already configured.
      */
     fun <K> keyedRateLimiterNamed(
         registry: KeyedRateLimiterRegistry,
@@ -177,6 +219,9 @@ class TypedResilientBuilder<Input> internal constructor() {
      * typed policy (directly or through an included [ResilienceTemplate]): building without it
      * throws, because the static [CacheConfig.key] would make different inputs share one entry.
      * The derived key is used only internally; cache events report a redacted key.
+     *
+     * @throws IllegalArgumentException from [resilientFor] when this is set but no [cache] is
+     *   configured, or when [cache] is configured without it.
      */
     fun cacheKeyFor(keyFor: (Input) -> String) {
         cacheKeyFor = keyFor
@@ -185,7 +230,10 @@ class TypedResilientBuilder<Input> internal constructor() {
     /**
      * Derives the coalescing key from the execution [Input]. Required when [coalesce] is configured
      * in a typed policy (directly or through an included template); concurrent executions with the
-     * same key share one in-flight call, different keys run separately.
+     * same key share one in-flight call, different keys run separately. The key is used only
+     * internally and never appears in events.
+     *
+     * @throws IllegalArgumentException from [resilientFor] when [coalesce] is not configured.
      */
     fun coalesceKeyFor(keyFor: (Input) -> String) {
         coalesceKeyFor = keyFor
@@ -208,7 +256,8 @@ class TypedResilientBuilder<Input> internal constructor() {
     /**
      * Includes a context-free [ResilienceTemplate] with lexical overlay semantics, exactly like
      * [ResilientBuilder.include]. The template is not tied to [Input], so one template can be
-     * included in typed policies of unrelated input types.
+     * included in typed policies of unrelated input types. Included configurations are cloned, later
+     * blocks win property by property, and the last explicit [compositionOrder] wins.
      */
     fun include(template: ResilienceTemplate) = delegate.include(template)
 }
@@ -216,7 +265,16 @@ class TypedResilientBuilder<Input> internal constructor() {
 /**
  * Builds a [TypedResilientPolicy] for executions that carry an explicit [Input].
  *
- * Uses the same composition engine and default ordering as [resilient].
+ * Uses the same composition engine and default ordering as [resilient]. The `resilientScope`
+ * governs coroutine lifecycle only; the execution data is the [Input] passed to
+ * [TypedResilientPolicy.execute].
+ *
+ * @param resilientScope The [ResilientScope] in which background jobs of the policies run.
+ * @param block Configures the policies of this typed policy.
+ * @return A new [TypedResilientPolicy] with its own runtime state, except for registry-owned state.
+ * @throws IllegalArgumentException if [TypedResilientBuilder.cache] or [TypedResilientBuilder.coalesce]
+ *   is configured without the matching `cacheKeyFor`/`coalesceKeyFor`, if a key function is set without
+ *   its policy, or if the configuration is otherwise invalid.
  */
 fun <Input> resilientFor(
     resilientScope: ResilientScope,
@@ -251,6 +309,9 @@ fun <Input> resilientFor(
 /**
  * Builds a [TypedResilientPolicy] bound to the lifecycle of this [CoroutineScope].
  * Closing the policy does not cancel this scope; cancelling this scope stops the policy's jobs.
+ *
+ * @param block Configures the policies of this typed policy.
+ * @return A new [TypedResilientPolicy]; see the [ResilientScope] overload for the validation rules.
  */
 fun <Input> CoroutineScope.resilientFor(
     block: TypedResilientBuilder<Input>.() -> Unit

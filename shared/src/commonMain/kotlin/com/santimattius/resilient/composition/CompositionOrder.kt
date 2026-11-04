@@ -3,6 +3,8 @@ package com.santimattius.resilient.composition
 /**
  * Defines the order in which resilience policies are composed.
  * Policies are applied from outermost (first in list) to innermost (last in list).
+ * Internal counterpart of the list passed to [ResilientBuilder.compositionOrder]; the last explicit
+ * order set on a builder (directly or through an included [ResilienceTemplate]) wins.
  *
  * **Important**: Fallback is always positioned outermost (first) and cannot be configured.
  * This ensures it can catch all failures from other policies.
@@ -17,6 +19,7 @@ package com.santimattius.resilient.composition
  * - Retry attempts to recover from transient failures
  * - Circuit Breaker prevents hammering failing services
  * - Rate Limiter controls request rate
+ * - Keyed Rate Limiter applies per-key quotas (typed policies only), inside the global limiter by default
  * - Bulkhead limits concurrency
  * - Hedging runs parallel attempts close to execution
  * - Chaos is innermost to inject faults/latency directly around the user block

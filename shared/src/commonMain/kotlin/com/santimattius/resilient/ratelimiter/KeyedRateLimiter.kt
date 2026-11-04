@@ -20,6 +20,13 @@ import kotlin.time.Duration.Companion.seconds
  *
  * The caller owns the coroutine that invokes [execute]. Cancellation is propagated and releases the
  * bucket's active-execution reservation in `finally`.
+ *
+ * Keys are never exposed: the limiter's telemetry callback, [snapshot] and its exceptions carry no
+ * raw context and no derived key. Inside a typed policy, use [com.santimattius.resilient.composition.resilientFor]
+ * with `keyedRateLimiter` rather than instantiating this class directly.
+ *
+ * @param C The type of the execution context from which the key is derived.
+ * @param K The type of the bucket key; must have stable `equals`/`hashCode`.
  */
 class KeyedRateLimiter<C, K>(
     config: KeyedRateLimiterConfig<C, K>,
@@ -34,6 +41,11 @@ class KeyedRateLimiter<C, K>(
      * Key extraction happens before this limiter changes bucket state. If [KeyedRateLimiterConfig.keyProvider]
      * throws, no bucket is created and no permit is consumed.
      *
+     * @param context The execution context from which the bucket key is derived.
+     * @param block The suspendable operation to run after a permit is acquired.
+     * @return The result of [block].
+     * @throws RateLimitExceededException when the bucket's quota is exhausted and no permit is obtained
+     * within [KeyedRateLimiterConfig.timeoutWhenLimited].
      * @throws KeyedRateLimiterCapacityExceededException when [KeyedRateLimiterConfig.maxBuckets] is reached
      * and every bucket is active or waiting. The exception never includes a raw key.
      */
@@ -133,25 +145,29 @@ class KeyedRateLimiter<C, K>(
  * or hashed dimension if observability needs key grouping.
  */
 class KeyedRateLimiterConfig<C, K> {
-    /** Produces the bucket key for one [KeyedRateLimiter.execute] call. */
+    /** Produces the bucket key for one [KeyedRateLimiter.execute] call. Required; must not throw for valid input. */
     lateinit var keyProvider: (C) -> K
 
-    /** Maximum number of resident buckets. */
+    /** Maximum number of resident buckets; must be at least 1. Defaults to 1000. */
     var maxBuckets: Int = 1_000
 
-    /** Idle duration after which an inactive bucket is discarded. */
+    /** Idle duration after which an inactive bucket is discarded; must be greater than zero. Defaults to 5 minutes. */
     var bucketIdleTtl: Duration = 5.minutes
 
-    /** Maximum permits available independently in each bucket per [period]. */
+    /** Maximum permits available independently in each bucket per [period]; must be at least 1. Defaults to 100. */
     var maxCalls: Int = 100
 
-    /** Fixed-window duration used by each bucket. */
+    /** Fixed-window duration used by each bucket; must be greater than zero. Defaults to 1 second. */
     var period: Duration = 1.seconds
 
-    /** Optional maximum wait for a bucket permit; null rejects immediately when its quota is exhausted. */
+    /** Optional maximum wait for a bucket permit; null rejects immediately when its quota is exhausted. Must not be negative. */
     var timeoutWhenLimited: Duration? = null
 
-    /** Called when a bucket is rate limited, without exposing its key. */
+    /**
+     * Called when a bucket is rate limited, without exposing its key. Inside a typed policy, the
+     * telemetry callback that emits [com.santimattius.resilient.telemetry.ResilientEvent.KeyedRateLimited]
+     * runs first, then this callback.
+     */
     var onRateLimited: suspend () -> Unit = { }
 
     /** Clock for fixed-window refills and idle expiration; inject a deterministic one in tests. */
@@ -184,7 +200,8 @@ class KeyedRateLimiterConfig<C, K> {
 /**
  * Point-in-time, privacy-safe snapshot of a [KeyedRateLimiter].
  *
- * Contains aggregate counts only; it never carries keys or execution context.
+ * Contains aggregate counts only; it never carries keys or execution context. Obtain it from
+ * [KeyedRateLimiter.snapshot] or `TypedResilientPolicy.getKeyedRateLimiterSnapshot`.
  *
  * @property residentBuckets Number of per-key buckets currently resident.
  * @property maxBuckets Configured upper bound for resident buckets.
@@ -194,7 +211,13 @@ data class KeyedRateLimiterSnapshot(
     val maxBuckets: Int,
 )
 
-/** Creates a typed [KeyedRateLimiter] from [configure]. */
+/**
+ * Creates a typed [KeyedRateLimiter] from [configure].
+ *
+ * @param configure Configures the [KeyedRateLimiterConfig]; its `keyProvider` is required.
+ * @return A standalone limiter with its own buckets (not shared through any registry).
+ * @throws IllegalArgumentException if the configuration is invalid (for example a missing `keyProvider`).
+ */
 fun <C, K> keyedRateLimiter(configure: KeyedRateLimiterConfig<C, K>.() -> Unit): KeyedRateLimiter<C, K> =
     KeyedRateLimiter(KeyedRateLimiterConfig<C, K>().apply(configure))
 
