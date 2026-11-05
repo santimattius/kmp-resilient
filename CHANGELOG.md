@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - **Keyed Rate Limiter**
   - Typed `KeyedRateLimiter<C, K>` and `keyedRateLimiter<C, K> { ... }` DSL for independent per-key quotas.
-  - Bounded bucket cardinality with idle TTL and inactive-only LRU eviction.
+  - Bounded bucket cardinality with idle TTL and LRU eviction of inactive buckets whose window has ended; a key never regains quota early, and at capacity new keys are rejected with `KeyedRateLimiterCapacityExceededException`.
   - Active and waiting buckets remain resident; capacity errors and callbacks do not expose raw keys.
 - **Typed keyed and global rate limiting**
   - `keyedRateLimiter<K> { ... }` and `keyedRateLimiterNamed<K>(registry, name) { ... }` in `resilientFor<Input>`, composable with the global rate limiter in one `execute(input)` call.

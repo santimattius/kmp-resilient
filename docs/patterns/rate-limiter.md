@@ -154,7 +154,7 @@ Each key has its own `maxCalls`/`period` quota: exhausting one tenant does not a
 
 ### Cardinality and lifecycle
 
-`maxBuckets` bounds resident key buckets. On each execution, inactive buckets past `bucketIdleTtl` are removed. If capacity is still full, the least-recently-used **inactive** bucket is evicted. Buckets with an executing block or a caller waiting for a token are never evicted. If every bucket is active or waiting, the new key is rejected with `KeyedRateLimiterCapacityExceededException`; its message intentionally contains no raw key material. Cancellation propagates to the caller and releases the bucket reservation in `finally`.
+`maxBuckets` bounds resident key buckets. A bucket is only discarded when it is inactive **and its `period` window has ended**, so a key can never regain quota early: the effective idle time is `max(bucketIdleTtl, period)`. On each execution, such buckets past that idle time are removed. If capacity is still full, the least-recently-used discardable bucket is evicted. Buckets with an executing block, a caller waiting for a token, or an open window are never evicted. If no bucket can be discarded, the new key is rejected with `KeyedRateLimiterCapacityExceededException` (the limiter fails closed instead of resetting another key's quota, so size `maxBuckets` for your peak number of distinct keys per `period`); its message intentionally contains no raw key material. Cancellation propagates to the caller and releases the bucket reservation in `finally`.
 
 ### Composing a global quota with a per-key quota
 

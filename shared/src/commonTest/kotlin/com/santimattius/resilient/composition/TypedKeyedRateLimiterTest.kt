@@ -1,5 +1,6 @@
 package com.santimattius.resilient.composition
 
+import com.santimattius.resilient.circuitbreaker.TestTimeSource
 import com.santimattius.resilient.annotations.ResilientExperimentalApi
 import com.santimattius.resilient.ratelimiter.KeyedRateLimiterCapacityExceededException
 import com.santimattius.resilient.ratelimiter.KeyedRateLimiterRegistry
@@ -280,12 +281,14 @@ class TypedKeyedRateLimiterTest {
 
     @Test
     fun `given cancelled execution inside keyed limiter when retried then bucket is released`() = runTest {
+        val clock = TestTimeSource()
         val policy = resilientFor<Request>(ResilientScope()) {
             keyedRateLimiter<String> {
                 keyProvider = { it.tenant }
                 maxBuckets = 1
                 maxCalls = 5
                 period = 10.minutes
+                timeSource = clock
             }
         }
         val job = launch(start = CoroutineStart.UNDISPATCHED) {
@@ -295,6 +298,8 @@ class TypedKeyedRateLimiterTest {
         job.cancelAndJoin()
 
         // maxBuckets = 1: a leaked active reservation would make a new key fail with capacity exceeded.
+        // Once released, the bucket is only discarded after its window ends.
+        clock.advanceTimeBy(10.minutes.inWholeMilliseconds)
         policy.execute(Request("b")) { }
         assertTrue(policy.getKeyedRateLimiterSnapshot()!!.residentBuckets <= 1)
     }
