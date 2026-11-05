@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - **Rate Limiter**
   - Concurrent waiters now receive at most one refilled permit per configured window while sharing the original timeout budget.
+  - A limiter shared through `RateLimiterRegistry` (`rateLimiterNamed`) now emits `ResilientEvent.RateLimited` on the `events` of the policy whose execution was limited, instead of on the policy that first created the entry, and no longer retains a reference to that policy.
 
 ### Changed
 

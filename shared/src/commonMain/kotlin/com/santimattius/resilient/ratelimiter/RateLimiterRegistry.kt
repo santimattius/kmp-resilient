@@ -24,6 +24,8 @@ class RateLimiterRegistry {
      * @param configure Lambda to configure [RateLimiterConfig] — only applied on first creation.
      * @param onRateLimited Optional suspendable callback forwarded to [DefaultRateLimiter] **only** when the
      *   instance is first created. Receives the wait [Duration] before the rate-limited call is allowed or rejected.
+     *   It is shared by every user of the entry, so do not use it for per-policy telemetry: policies built with
+     *   `resilient { }` attribute [com.santimattius.resilient.telemetry.ResilientEvent.RateLimited] per execution.
      */
     fun getOrCreate(
         name: String,

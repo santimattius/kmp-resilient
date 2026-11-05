@@ -69,7 +69,7 @@ class KeyedRateLimiter<C, K>(
         val key = settings.keyProvider(context)
         val bucket = acquireBucket(key)
         try {
-            return bucket.limiter.executeObserved(observer, block)
+            return bucket.limiter.executeObserved(observer?.let { keyless -> { _ -> keyless() } }, block)
         } finally {
             releaseBucket(bucket)
         }
