@@ -54,11 +54,22 @@ class KeyedRateLimiter<C, K>(
     suspend fun <T> execute(
         context: C,
         block: suspend () -> T,
+    ): T = executeObserved(context, null, block)
+
+    /**
+     * Like [execute], but also invokes [observer] when this call's bucket is rate limited. The observer is
+     * scoped to this call, so a limiter shared through a [KeyedRateLimiterRegistry] reports to the caller
+     * that was limited and never retains a reference to any caller. It receives no key.
+     */
+    internal suspend fun <T> executeObserved(
+        context: C,
+        observer: (suspend () -> Unit)?,
+        block: suspend () -> T,
     ): T {
         val key = settings.keyProvider(context)
         val bucket = acquireBucket(key)
         try {
-            return bucket.limiter.execute(block)
+            return bucket.limiter.executeObserved(observer, block)
         } finally {
             releaseBucket(bucket)
         }

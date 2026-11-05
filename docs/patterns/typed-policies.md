@@ -83,6 +83,7 @@ compositionOrder(listOf(OrderablePolicyType.KEYED_RATE_LIMITER, OrderablePolicyT
 
 - `getHealthSnapshot().rateLimiter` reports the global limiter; `getKeyedRateLimiterSnapshot()` reports the keyed one (aggregate counts only, `null` when not configured).
 - Rate limiting by key emits the keyless `ResilientEvent.KeyedRateLimited`.
+- With `keyedRateLimiterNamed`, the event is emitted on the `events` flow of the policy whose execution was limited, even when another policy created the shared limiter.
 - Raw input and derived keys never appear in events, snapshots or exception messages (including `KeyedRateLimiterCapacityExceededException`). If you need key grouping in metrics, use an approved bounded or hashed dimension.
 
 ## Migrating from nested `execute` calls
