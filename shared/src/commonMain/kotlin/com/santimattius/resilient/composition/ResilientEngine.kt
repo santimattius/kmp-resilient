@@ -215,10 +215,13 @@ internal class ResilientEngine(
             } else {
                 composed()
             }
-            events.emit(ResilientEvent.OperationSuccess(mark.elapsedNow()))
+            // tryEmit never suspends: a slow events collector must not delay the caller's result.
+            events.tryEmit(ResilientEvent.OperationSuccess(mark.elapsedNow()))
             result
         } catch (t: Throwable) {
-            events.emit(ResilientEvent.OperationFailure(t, mark.elapsedNow()))
+            // tryEmit never suspends or throws, so the original exception (including a
+            // CancellationException) always propagates unchanged, even if the buffer is full.
+            events.tryEmit(ResilientEvent.OperationFailure(t, mark.elapsedNow()))
             throw t
         }
     }
