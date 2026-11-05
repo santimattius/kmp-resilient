@@ -25,7 +25,9 @@ class KeyedRateLimiterRegistry {
      * @param name The name that identifies the shared limiter.
      * @param configure Configures the limiter; applied only when the entry is first created.
      * @param onRateLimited Optional callback invoked (without any key) when a bucket is rate limited;
-     *   applied **only** at first creation, and invoked before the callback set in [configure].
+     *   applied **only** at first creation and shared by every user of the entry, so do not use it for
+     *   per-policy telemetry (typed policies attribute events per execution instead). It is invoked
+     *   before the callback set in [configure].
      * @return The shared [KeyedRateLimiter] registered under [name].
      */
     @Suppress("UNCHECKED_CAST")

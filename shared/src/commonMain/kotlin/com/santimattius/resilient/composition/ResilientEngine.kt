@@ -54,7 +54,7 @@ import kotlin.time.TimeSource
 internal class ResilientEngine(
     private val builder: ResilientBuilder,
     resilientScope: ResilientScope,
-    keyedRateLimiterFactory: (((suspend () -> Unit) -> KeyedRateLimiter<Any?, *>))? = null,
+    keyedRateLimiterFactory: (() -> KeyedRateLimiter<Any?, *>)? = null,
     private val cacheKeyFor: ((Any?) -> String)? = null,
     private val coalesceKeyFor: ((Any?) -> String)? = null
 ) {
@@ -137,8 +137,11 @@ internal class ResilientEngine(
         )
     }
 
-    // Keyed limiter telemetry carries no key or input; the factory receives only a keyless callback.
-    private val keyedRateLimiter: KeyedRateLimiter<Any?, *>? = keyedRateLimiterFactory?.invoke {
+    // Keyed limiter telemetry carries no key or input. The observer is passed per execution (not stored in
+    // the limiter) so a limiter shared through a registry reports to the policy that was limited.
+    private val keyedRateLimiter: KeyedRateLimiter<Any?, *>? = keyedRateLimiterFactory?.invoke()
+
+    private val onKeyedRateLimited: suspend () -> Unit = {
         events.emit(ResilientEvent.KeyedRateLimited)
     }
 
@@ -305,7 +308,7 @@ internal class ResilientEngine(
                     }
 
                     PolicyType.KEYED_RATE_LIMITER -> keyedRateLimiter?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute(input) { next() } } }
+                        { next: Execute<T> -> suspend { policy.executeObserved(input, onKeyedRateLimited) { next() } } }
                     }
 
                     PolicyType.BULKHEAD -> bulkhead?.let { policy ->
@@ -326,7 +329,7 @@ internal class ResilientEngine(
                 if (chaos != null) add { next -> { chaos.execute { next() } } }
                 if (hedging != null) add { next -> { hedging.execute { next() } } }
                 if (bulkhead != null) add { next -> { bulkhead.execute { next() } } }
-                if (keyedRateLimiter != null) add { next -> { keyedRateLimiter.execute(input) { next() } } }
+                if (keyedRateLimiter != null) add { next -> { keyedRateLimiter.executeObserved(input, onKeyedRateLimited) { next() } } }
                 if (rateLimiter != null) add { next -> { rateLimiter.execute { next() } } }
                 if (circuitBreaker != null) add { next -> { circuitBreaker.execute { next() } } }
                 if (retry != null) add { next -> { retry.execute { next() } } }

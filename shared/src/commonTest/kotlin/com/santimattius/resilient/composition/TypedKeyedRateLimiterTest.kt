@@ -108,6 +108,34 @@ class TypedKeyedRateLimiterTest {
     }
 
     @Test
+    fun `given two policies sharing a named keyed limiter when the second is limited then only the second emits KeyedRateLimited`() =
+        runTest {
+            val registry = KeyedRateLimiterRegistry()
+            fun build() = resilientFor<Request>(ResilientScope()) {
+                keyedRateLimiterNamed<String>(registry, "api") {
+                    keyProvider = { it.tenant }
+                    maxCalls = 1
+                    period = 10.minutes
+                }
+            }
+            val first = build()
+            val second = build()
+            val firstSeen = mutableListOf<ResilientEvent>()
+            val secondSeen = mutableListOf<ResilientEvent>()
+            val firstJob = launch(UnconfinedTestDispatcher(testScheduler)) { first.events.collect { firstSeen += it } }
+            val secondJob = launch(UnconfinedTestDispatcher(testScheduler)) { second.events.collect { secondSeen += it } }
+
+            second.execute(Request("a")) { }
+            assertFailsWith<RateLimitExceededException> { second.execute(Request("a")) { } }
+            runCurrent()
+            firstJob.cancelAndJoin()
+            secondJob.cancelAndJoin()
+
+            assertEquals(1, secondSeen.count { it is ResilientEvent.KeyedRateLimited })
+            assertEquals(0, firstSeen.count { it is ResilientEvent.KeyedRateLimited })
+        }
+
+    @Test
     fun `given keyed rejection when executed then exactly one operation outcome is emitted`() = runTest {
         val policy = resilientFor<Request>(ResilientScope()) {
             keyedRateLimiter<String> {

@@ -116,7 +116,7 @@ class TypedResilientBuilder<Input> internal constructor() {
     internal val delegate = ResilientBuilder()
     internal var cacheKeyFor: ((Input) -> String)? = null
     internal var coalesceKeyFor: ((Input) -> String)? = null
-    internal var keyedRateLimiterFactory: ((suspend () -> Unit) -> KeyedRateLimiter<Input, *>)? = null
+    internal var keyedRateLimiterFactory: (() -> KeyedRateLimiter<Input, *>)? = null
 
     /** @see ResilientBuilder.retry */
     fun retry(config: RetryPolicyConfig.() -> Unit) = delegate.retry(config)
@@ -159,23 +159,16 @@ class TypedResilientBuilder<Input> internal constructor() {
      */
     fun <K> keyedRateLimiter(config: KeyedRateLimiterConfig<Input, K>.() -> Unit) {
         requireKeyedNotConfigured()
-        keyedRateLimiterFactory = { onRateLimited ->
-            val cfg = KeyedRateLimiterConfig<Input, K>().apply(config)
-            val configured = cfg.onRateLimited
-            cfg.onRateLimited = {
-                onRateLimited()
-                configured()
-            }
-            KeyedRateLimiter(cfg)
-        }
+        keyedRateLimiterFactory = { KeyedRateLimiter(KeyedRateLimiterConfig<Input, K>().apply(config)) }
     }
 
     /**
      * Like [keyedRateLimiter] but resolves the limiter from [registry] by [name], so its per-key
      * quotas are shared by every build using the same registry and name. Closing a policy never
      * destroys registry-owned state. The first build that creates the entry wins: later builds reuse
-     * it and their [config] differences are ignored, and the [ResilientEvent.KeyedRateLimited]
-     * telemetry is wired only by the build that first creates the entry.
+     * it and their [config] differences are ignored. [ResilientEvent.KeyedRateLimited] is attributed to
+     * the policy whose execution was limited, not to the build that created the entry, and the shared
+     * limiter keeps no reference to any policy.
      *
      * @param K The type of the bucket key; use one name per input/key type.
      * @param registry The registry that owns the limiter.
@@ -189,7 +182,7 @@ class TypedResilientBuilder<Input> internal constructor() {
         config: KeyedRateLimiterConfig<Input, K>.() -> Unit
     ) {
         requireKeyedNotConfigured()
-        keyedRateLimiterFactory = { onRateLimited -> registry.getOrCreate(name, config, onRateLimited) }
+        keyedRateLimiterFactory = { registry.getOrCreate(name, config) }
     }
 
     private fun requireKeyedNotConfigured() {
@@ -302,7 +295,7 @@ fun <Input> resilientFor(
     val coalesceKeyFor = builder.coalesceKeyFor as ((Any?) -> String)?
     @Suppress("UNCHECKED_CAST")
     val keyedFactory = builder.keyedRateLimiterFactory
-        as ((suspend () -> Unit) -> KeyedRateLimiter<Any?, *>)?
+        as (() -> KeyedRateLimiter<Any?, *>)?
     return TypedResilientPolicy(ResilientEngine(builder.delegate, resilientScope, keyedFactory, cacheKeyFor, coalesceKeyFor))
 }
 
