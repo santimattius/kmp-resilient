@@ -79,14 +79,14 @@ class DefaultRateLimiter(
     override suspend fun <T> execute(block: suspend () -> T): T = executeObserved(null, block)
 
     /**
-     * Like [execute], but also invokes [observer] (after the constructor callback and before
-     * [RateLimiterConfig.onRateLimited]) when this call is rate limited. The observer belongs to this
-     * single call, so a limiter shared by several callers attributes the event to the caller that
+     * Like [execute], but also invokes [observer] with the wait [Duration] (after the constructor callback
+     * and before [RateLimiterConfig.onRateLimited]) when this call is rate limited. The observer belongs to
+     * this single call, so a limiter shared by several callers attributes the event to the caller that
      * was limited instead of to whoever created the limiter.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     internal suspend fun <T> executeObserved(
-        observer: (suspend () -> Unit)?,
+        observer: (suspend (Duration) -> Unit)?,
         block: suspend () -> T,
     ): T {
         var waitedForRefillAtMs = 0L
@@ -104,7 +104,7 @@ class DefaultRateLimiter(
 
         if (waitDuration != null) {
             onRateLimited(waitDuration)
-            observer?.invoke()
+            observer?.invoke(waitDuration)
             config.onRateLimited()
             var remainingTimeout = config.timeoutWhenLimited
 

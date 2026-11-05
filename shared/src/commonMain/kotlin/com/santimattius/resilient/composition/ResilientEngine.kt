@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -124,17 +125,16 @@ internal class ResilientEngine(
         }
     }
 
+    // The observer is passed per execution (not stored in the limiter) so a limiter shared through a
+    // registry reports to the policy that was limited, not to the one that created it.
     private val rateLimiter = builder.rateLimiterNamedSpec?.let { spec ->
-        spec.registry.getOrCreate(spec.name, spec.configure) { wait ->
-            events.emit(ResilientEvent.RateLimited(wait))
-        }
+        spec.registry.getOrCreate(spec.name, spec.configure)
     } ?: builder.rateLimiterConfig?.let { cfg ->
-        DefaultRateLimiter(
-            config = cfg,
-            onRateLimited = { wait ->
-                events.emit(ResilientEvent.RateLimited(wait))
-            }
-        )
+        DefaultRateLimiter(config = cfg)
+    }
+
+    private val onRateLimited: suspend (Duration) -> Unit = { wait ->
+        events.emit(ResilientEvent.RateLimited(wait))
     }
 
     // Keyed limiter telemetry carries no key or input. The observer is passed per execution (not stored in
@@ -304,7 +304,7 @@ internal class ResilientEngine(
                     }
 
                     PolicyType.RATE_LIMITER -> rateLimiter?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        { next: Execute<T> -> suspend { policy.executeObserved(onRateLimited) { next() } } }
                     }
 
                     PolicyType.KEYED_RATE_LIMITER -> keyedRateLimiter?.let { policy ->
@@ -330,7 +330,7 @@ internal class ResilientEngine(
                 if (hedging != null) add { next -> { hedging.execute { next() } } }
                 if (bulkhead != null) add { next -> { bulkhead.execute { next() } } }
                 if (keyedRateLimiter != null) add { next -> { keyedRateLimiter.executeObserved(input, onKeyedRateLimited) { next() } } }
-                if (rateLimiter != null) add { next -> { rateLimiter.execute { next() } } }
+                if (rateLimiter != null) add { next -> { rateLimiter.executeObserved(onRateLimited) { next() } } }
                 if (circuitBreaker != null) add { next -> { circuitBreaker.execute { next() } } }
                 if (retry != null) add { next -> { retry.execute { next() } } }
                 if (timeout != null) add { next -> { timeout.execute { next() } } }
