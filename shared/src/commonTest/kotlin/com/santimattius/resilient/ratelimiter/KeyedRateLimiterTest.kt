@@ -34,7 +34,7 @@ class KeyedRateLimiterTest {
         }
 
     @Test
-    fun `when capacity is reached the least recently used inactive bucket is evicted`() =
+    fun `when capacity is reached the least recently used inactive bucket with a closed window is evicted`() =
         runTest {
             val clock = TestTimeSource()
             val limiter =
@@ -54,9 +54,9 @@ class KeyedRateLimiterTest {
             assertFailsWith<RateLimitExceededException> {
                 limiter.execute(Request("b")) { "b-exhausted" }
             }
-            clock.advanceTimeBy(1)
+            clock.advanceTimeBy(1_000)
             limiter.execute(Request("a")) { "a-2" }
-            clock.advanceTimeBy(1)
+            clock.advanceTimeBy(1_000)
             limiter.execute(Request("c")) { "c-1" }
 
             assertEquals("b-fresh", limiter.execute(Request("b")) { "b-fresh" })
@@ -70,7 +70,7 @@ class KeyedRateLimiterTest {
                 keyedRateLimiter<Request, String> {
                     keyProvider = { it.tenant }
                     maxCalls = 1
-                    period = 1.seconds
+                    period = 100.milliseconds
                     maxBuckets = 2
                     bucketIdleTtl = 100.milliseconds
                     timeSource = clock
@@ -83,12 +83,88 @@ class KeyedRateLimiterTest {
         }
 
     @Test
+    fun `an exhausted bucket is not evicted by idle ttl before its window ends`() =
+        runTest {
+            val clock = TestTimeSource()
+            val limiter =
+                keyedRateLimiter<Request, String> {
+                    keyProvider = { it.tenant }
+                    maxCalls = 1
+                    period = 1.seconds
+                    bucketIdleTtl = 100.milliseconds
+                    timeSource = clock
+                }
+
+            limiter.execute(Request("a")) { "a-1" }
+            clock.advanceTimeBy(500)
+
+            assertFailsWith<RateLimitExceededException> {
+                limiter.execute(Request("a")) { "a-2" }
+            }
+            clock.advanceTimeBy(500)
+            assertEquals("a-3", limiter.execute(Request("a")) { "a-3" })
+        }
+
+    @Test
+    fun `a partially used bucket keeps its consumed permits until its window ends`() =
+        runTest {
+            val clock = TestTimeSource()
+            val limiter =
+                keyedRateLimiter<Request, String> {
+                    keyProvider = { it.tenant }
+                    maxCalls = 2
+                    period = 1.seconds
+                    bucketIdleTtl = 100.milliseconds
+                    timeSource = clock
+                }
+
+            limiter.execute(Request("a")) { "a-1" }
+            clock.advanceTimeBy(500)
+            limiter.execute(Request("a")) { "a-2" }
+
+            assertFailsWith<RateLimitExceededException> {
+                limiter.execute(Request("a")) { "a-3" }
+            }
+        }
+
+    @Test
+    fun `capacity never evicts a bucket whose window is still open`() =
+        runTest {
+            val clock = TestTimeSource()
+            val limiter =
+                keyedRateLimiter<Request, String> {
+                    keyProvider = { it.tenant }
+                    maxCalls = 1
+                    period = 1.seconds
+                    maxBuckets = 2
+                    timeSource = clock
+                }
+
+            limiter.execute(Request("a")) { "a-1" }
+            clock.advanceTimeBy(1)
+            limiter.execute(Request("b")) { "b-1" }
+            clock.advanceTimeBy(1)
+
+            assertFailsWith<KeyedRateLimiterCapacityExceededException> {
+                limiter.execute(Request("c")) { "c-1" }
+            }
+            assertFailsWith<RateLimitExceededException> {
+                limiter.execute(Request("a")) { "a-2" }
+            }
+
+            clock.advanceTimeBy(1_000)
+            assertEquals("c-2", limiter.execute(Request("c")) { "c-2" })
+        }
+
+    @Test
     fun `active buckets are never evicted and capacity errors omit raw keys`() =
         runTest {
+            val clock = TestTimeSource()
             val limiter =
                 keyedRateLimiter<Request, String> {
                     keyProvider = { it.tenant }
                     maxBuckets = 1
+                    timeSource = clock
                 }
             val active =
                 async {
@@ -107,12 +183,14 @@ class KeyedRateLimiterTest {
 
             active.cancel()
             assertFailsWith<CancellationException> { active.await() }
+            clock.advanceTimeBy(1_000)
             assertEquals("available", limiter.execute(Request("other-tenant")) { "available" })
         }
 
     @Test
     fun `waiting buckets are never evicted`() =
         runTest {
+            val clock = TestTimeSource()
             val limiter =
                 keyedRateLimiter<Request, String> {
                     keyProvider = { it.tenant }
@@ -120,6 +198,7 @@ class KeyedRateLimiterTest {
                     period = 1.seconds
                     timeoutWhenLimited = 2.seconds
                     maxBuckets = 1
+                    timeSource = clock
                 }
             limiter.execute(Request("tenant-a")) { "first" }
             val waiting = async { limiter.execute(Request("tenant-a")) { "waiting" } }
@@ -131,6 +210,7 @@ class KeyedRateLimiterTest {
 
             waiting.cancel()
             assertFailsWith<CancellationException> { waiting.await() }
+            clock.advanceTimeBy(1_000)
             assertEquals("available", limiter.execute(Request("tenant-b")) { "available" })
         }
 
@@ -169,10 +249,12 @@ class KeyedRateLimiterTest {
     @Test
     fun `cancelling an execution releases its bucket in finally`() =
         runTest {
+            val clock = TestTimeSource()
             val limiter =
                 keyedRateLimiter<Request, String> {
                     keyProvider = { it.tenant }
                     maxBuckets = 1
+                    timeSource = clock
                 }
             val cancelled =
                 async {
@@ -185,6 +267,7 @@ class KeyedRateLimiterTest {
 
             cancelled.cancel()
             assertFailsWith<CancellationException> { cancelled.await() }
+            clock.advanceTimeBy(1_000)
             assertEquals("b", limiter.execute(Request("b")) { "b" })
         }
 

@@ -47,7 +47,9 @@ class KeyedRateLimiter<C, K>(
      * @throws RateLimitExceededException when the bucket's quota is exhausted and no permit is obtained
      * within [KeyedRateLimiterConfig.timeoutWhenLimited].
      * @throws KeyedRateLimiterCapacityExceededException when [KeyedRateLimiterConfig.maxBuckets] is reached
-     * and every bucket is active or waiting. The exception never includes a raw key.
+     * and no bucket can be discarded: every bucket is active, waiting, or still inside its window.
+     * Buckets are never discarded before their window ends, so this limiter fails closed instead of
+     * resetting a key's quota. The exception never includes a raw key.
      */
     suspend fun <T> execute(
         context: C,
@@ -92,7 +94,7 @@ class KeyedRateLimiter<C, K>(
             val leastRecentlyUsed =
                 buckets.values
                     .asSequence()
-                    .filter { it.activeExecutions == 0 }
+                    .filter { it.isEvictable(now) }
                     .minByOrNull { it.lastUsedAtMs }
                     ?: throw KeyedRateLimiterCapacityExceededException()
             buckets.entries.removeAll { it.value === leastRecentlyUsed }
@@ -125,9 +127,18 @@ class KeyedRateLimiter<C, K>(
 
     private fun removeExpiredInactiveBuckets(now: Long) {
         buckets.entries.removeAll { (_, bucket) ->
-            bucket.activeExecutions == 0 && now - bucket.lastUsedAtMs >= settings.bucketIdleTtlMs
+            bucket.isEvictable(now) && now - bucket.lastUsedAtMs >= settings.bucketIdleTtlMs
         }
     }
+
+    /**
+     * A bucket may be discarded only when no execution uses it and its fixed window has ended, so
+     * discarding it can never grant a key more than [KeyedRateLimiterConfig.maxCalls] per period.
+     * The bucket's window started no later than its last use, so `period` elapsed since then is a
+     * conservative proof that the window has closed.
+     */
+    private fun Bucket.isEvictable(now: Long): Boolean =
+        activeExecutions == 0 && now - lastUsedAtMs >= settings.period.inWholeMilliseconds
 
     private class Bucket(
         val limiter: DefaultRateLimiter,
@@ -148,10 +159,21 @@ class KeyedRateLimiterConfig<C, K> {
     /** Produces the bucket key for one [KeyedRateLimiter.execute] call. Required; must not throw for valid input. */
     lateinit var keyProvider: (C) -> K
 
-    /** Maximum number of resident buckets; must be at least 1. Defaults to 1000. */
+    /**
+     * Maximum number of resident buckets; must be at least 1. Defaults to 1000.
+     *
+     * A bucket is only discarded when it is inactive and its [period] window has ended. When the limit
+     * is reached and no bucket qualifies, new keys are rejected with
+     * [KeyedRateLimiterCapacityExceededException] instead of evicting a bucket and resetting its quota.
+     */
     var maxBuckets: Int = 1_000
 
-    /** Idle duration after which an inactive bucket is discarded; must be greater than zero. Defaults to 5 minutes. */
+    /**
+     * Idle duration after which an inactive bucket is discarded; must be greater than zero. Defaults to 5 minutes.
+     *
+     * A bucket is never discarded before its [period] window ends, so the effective idle time is
+     * `max(bucketIdleTtl, period)`. This keeps a key from regaining quota early.
+     */
     var bucketIdleTtl: Duration = 5.minutes
 
     /** Maximum permits available independently in each bucket per [period]; must be at least 1. Defaults to 100. */
