@@ -145,14 +145,16 @@ internal class ResilientEngine(
         events.emit(ResilientEvent.KeyedRateLimited)
     }
 
+    // The rejection observer is passed per execution (not stored in the bulkhead) so a bulkhead shared
+    // through a registry reports to the policy that was rejected, not the one that created it.
     private val bulkhead = builder.bulkheadNamedSpec?.let { spec ->
-        spec.registry.getOrCreate(spec.name, spec.configure) { reason ->
-            events.tryEmit(ResilientEvent.BulkheadRejected(reason))
-        }
+        spec.registry.getOrCreate(spec.name, spec.configure)
     } ?: builder.bulkheadConfig?.let { cfg ->
-        DefaultBulkhead(cfg) { reason ->
-            events.tryEmit(ResilientEvent.BulkheadRejected(reason))
-        }
+        DefaultBulkhead(cfg)
+    }
+
+    private val onBulkheadRejected: (String) -> Unit = { reason ->
+        events.tryEmit(ResilientEvent.BulkheadRejected(reason))
     }
     private val hedging = builder.hedgingConfig?.let { cfg ->
         DefaultHedgingPolicy(cfg) { attemptIndex ->
@@ -312,7 +314,7 @@ internal class ResilientEngine(
                     }
 
                     PolicyType.BULKHEAD -> bulkhead?.let { policy ->
-                        { next: Execute<T> -> suspend { policy.execute { next() } } }
+                        { next: Execute<T> -> suspend { policy.executeObserved(onBulkheadRejected) { next() } } }
                     }
 
                     PolicyType.HEDGING -> hedging?.let { policy ->
@@ -328,7 +330,7 @@ internal class ResilientEngine(
             buildList {
                 if (chaos != null) add { next -> { chaos.execute { next() } } }
                 if (hedging != null) add { next -> { hedging.execute { next() } } }
-                if (bulkhead != null) add { next -> { bulkhead.execute { next() } } }
+                if (bulkhead != null) add { next -> { bulkhead.executeObserved(onBulkheadRejected) { next() } } }
                 if (keyedRateLimiter != null) add { next -> { keyedRateLimiter.executeObserved(input, onKeyedRateLimited) { next() } } }
                 if (rateLimiter != null) add { next -> { rateLimiter.executeObserved(onRateLimited) { next() } } }
                 if (circuitBreaker != null) add { next -> { circuitBreaker.execute { next() } } }
