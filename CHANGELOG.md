@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+### Added
+
+- `DefaultCircuitBreaker.transitions`: ordered `SharedFlow<CircuitStateTransition>` of every state change.
+
+### Changed
+
+- Policies sharing a `circuitBreakerNamed` entry now all receive `CircuitStateChanged` (previously only the policy that first created the entry did).
+
 ---
 ## [2.1.0] - Unreleased
 

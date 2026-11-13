@@ -35,6 +35,8 @@ import com.santimattius.resilient.timeout.TimeoutConfig
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration
@@ -100,12 +102,10 @@ internal class ResilientEngine(
     }
 
     // Named circuit breaker takes precedence over the inline config block.
-    // When the named spec resolves to an existing registry entry, the onStateChanged callback
-    // is set only at creation time — see CircuitBreakerRegistry.getOrCreate telemetry note.
+    // A shared breaker has no single owner for its transitions, so every policy using it subscribes to
+    // the breaker's transitions stream instead (see circuitTransitionsJob below).
     private val circuitBreaker: DefaultCircuitBreaker? = builder.circuitBreakerNamedSpec?.let { spec ->
-        spec.registry.getOrCreate(spec.name, spec.configure) { new, old ->
-            events.tryEmit(ResilientEvent.CircuitStateChanged(old, new))
-        }
+        spec.registry.getOrCreate(spec.name, spec.configure)
     } ?: builder.circuitBreakerConfig?.let { cfg ->
         // Clone config so the original is not mutated (avoids duplicate callbacks if config is reused)
         val copy = CircuitBreakerConfig().apply {
@@ -123,6 +123,19 @@ internal class ResilientEngine(
         DefaultCircuitBreaker(copy) { new, old ->
             events.tryEmit(ResilientEvent.CircuitStateChanged(old, new))
         }
+    }
+
+    // Forwards a registry-shared breaker's transitions to this policy's events. UNDISPATCHED so the
+    // subscription is active before the policy can execute anything. Cancelled in [close]; the breaker
+    // itself is registry-owned and is never closed here.
+    private val circuitTransitionsJob: Job? = if (builder.circuitBreakerNamedSpec != null) {
+        circuitBreaker?.let { shared ->
+            resilientScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                shared.transitions.collect { events.tryEmit(ResilientEvent.CircuitStateChanged(it.from, it.to)) }
+            }
+        }
+    } else {
+        null
     }
 
     // The observer is passed per execution (not stored in the limiter) so a limiter shared through a
@@ -186,6 +199,7 @@ internal class ResilientEngine(
     fun keyedRateLimiterSnapshot(): KeyedRateLimiterSnapshot? = keyedRateLimiter?.snapshot()
 
     fun close() {
+        circuitTransitionsJob?.cancel()
         cache?.close()
     }
 

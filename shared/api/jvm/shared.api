@@ -232,11 +232,25 @@ public final class com/santimattius/resilient/circuitbreaker/CircuitState : java
 	public static fun values ()[Lcom/santimattius/resilient/circuitbreaker/CircuitState;
 }
 
+public final class com/santimattius/resilient/circuitbreaker/CircuitStateTransition {
+	public fun <init> (Lcom/santimattius/resilient/circuitbreaker/CircuitState;Lcom/santimattius/resilient/circuitbreaker/CircuitState;)V
+	public final fun component1 ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public final fun component2 ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public final fun copy (Lcom/santimattius/resilient/circuitbreaker/CircuitState;Lcom/santimattius/resilient/circuitbreaker/CircuitState;)Lcom/santimattius/resilient/circuitbreaker/CircuitStateTransition;
+	public static synthetic fun copy$default (Lcom/santimattius/resilient/circuitbreaker/CircuitStateTransition;Lcom/santimattius/resilient/circuitbreaker/CircuitState;Lcom/santimattius/resilient/circuitbreaker/CircuitState;ILjava/lang/Object;)Lcom/santimattius/resilient/circuitbreaker/CircuitStateTransition;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFrom ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public final fun getTo ()Lcom/santimattius/resilient/circuitbreaker/CircuitState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/santimattius/resilient/circuitbreaker/DefaultCircuitBreaker : com/santimattius/resilient/circuitbreaker/CircuitBreaker {
 	public fun <init> (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerConfig;Lcom/santimattius/resilient/circuitbreaker/TimeSource;Lkotlin/jvm/functions/Function2;)V
 	public synthetic fun <init> (Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerConfig;Lcom/santimattius/resilient/circuitbreaker/TimeSource;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun execute (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getTransitions ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun snapshot ()Lcom/santimattius/resilient/circuitbreaker/CircuitBreakerSnapshot;
 }
 
