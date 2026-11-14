@@ -507,11 +507,29 @@ final class com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot { /
     final fun toString(): kotlin/String // com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot.toString|toString(){}[0]
 }
 
+final class com.santimattius.resilient.circuitbreaker/CircuitStateTransition { // com.santimattius.resilient.circuitbreaker/CircuitStateTransition|null[0]
+    constructor <init>(com.santimattius.resilient.circuitbreaker/CircuitState, com.santimattius.resilient.circuitbreaker/CircuitState) // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.<init>|<init>(com.santimattius.resilient.circuitbreaker.CircuitState;com.santimattius.resilient.circuitbreaker.CircuitState){}[0]
+
+    final val from // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.from|{}from[0]
+        final fun <get-from>(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.from.<get-from>|<get-from>(){}[0]
+    final val to // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.to|{}to[0]
+        final fun <get-to>(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.to.<get-to>|<get-to>(){}[0]
+
+    final fun component1(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.component1|component1(){}[0]
+    final fun component2(): com.santimattius.resilient.circuitbreaker/CircuitState // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.component2|component2(){}[0]
+    final fun copy(com.santimattius.resilient.circuitbreaker/CircuitState = ..., com.santimattius.resilient.circuitbreaker/CircuitState = ...): com.santimattius.resilient.circuitbreaker/CircuitStateTransition // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.copy|copy(com.santimattius.resilient.circuitbreaker.CircuitState;com.santimattius.resilient.circuitbreaker.CircuitState){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.santimattius.resilient.circuitbreaker/CircuitStateTransition.toString|toString(){}[0]
+}
+
 final class com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker : com.santimattius.resilient.circuitbreaker/CircuitBreaker { // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker|null[0]
     constructor <init>(com.santimattius.resilient.circuitbreaker/CircuitBreakerConfig, com.santimattius.resilient.circuitbreaker/TimeSource = ..., kotlin/Function2<com.santimattius.resilient.circuitbreaker/CircuitState, com.santimattius.resilient.circuitbreaker/CircuitState, kotlin/Unit> = ...) // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.<init>|<init>(com.santimattius.resilient.circuitbreaker.CircuitBreakerConfig;com.santimattius.resilient.circuitbreaker.TimeSource;kotlin.Function2<com.santimattius.resilient.circuitbreaker.CircuitState,com.santimattius.resilient.circuitbreaker.CircuitState,kotlin.Unit>){}[0]
 
     final val state // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.santimattius.resilient.circuitbreaker/CircuitState> // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.state.<get-state>|<get-state>(){}[0]
+    final val transitions // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.transitions|{}transitions[0]
+        final fun <get-transitions>(): kotlinx.coroutines.flow/SharedFlow<com.santimattius.resilient.circuitbreaker/CircuitStateTransition> // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.transitions.<get-transitions>|<get-transitions>(){}[0]
 
     final fun snapshot(): com.santimattius.resilient.circuitbreaker/CircuitBreakerSnapshot // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.snapshot|snapshot(){}[0]
     final suspend fun <#A1: kotlin/Any?> execute(kotlin.coroutines/SuspendFunction0<#A1>): #A1 // com.santimattius.resilient.circuitbreaker/DefaultCircuitBreaker.execute|execute(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]

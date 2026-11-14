@@ -2,8 +2,12 @@ package com.santimattius.resilient.circuitbreaker
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -91,6 +95,21 @@ class DefaultCircuitBreaker(
     private val mutex = Mutex()
     private val _state = MutableStateFlow(CircuitState.CLOSED)
     override val state: StateFlow<CircuitState> get() = _state
+
+    private val _transitions = MutableSharedFlow<CircuitStateTransition>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+
+    /**
+     * Every state transition of this breaker, in order. Unlike [state] it is not conflated and carries
+     * the previous state, so any number of consumers (for example every policy sharing this breaker
+     * through a [CircuitBreakerRegistry]) can observe the same transitions.
+     *
+     * Hot, no replay: a collector only sees transitions that happen after it subscribes. A collector that
+     * falls more than 64 transitions behind skips the oldest ones instead of blocking the breaker.
+     */
+    val transitions: SharedFlow<CircuitStateTransition> get() = _transitions.asSharedFlow()
 
     @Volatile
     private var failureCount: Int = 0
@@ -442,6 +461,7 @@ class DefaultCircuitBreaker(
             _state.value = new
             config.onStateChange(new)
             onStateChanged(new, old)
+            _transitions.tryEmit(CircuitStateTransition(from = old, to = new))
         }
     }
 
