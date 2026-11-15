@@ -1,18 +1,21 @@
 package com.santimattius.resilient.composition
 
+import com.santimattius.resilient.bulkhead.BulkheadFullException
+import com.santimattius.resilient.bulkhead.BulkheadRegistry
 import com.santimattius.resilient.circuitbreaker.CircuitBreakerRegistry
 import com.santimattius.resilient.circuitbreaker.CircuitState
 import com.santimattius.resilient.ratelimiter.RateLimitExceededException
 import com.santimattius.resilient.ratelimiter.RateLimiterRegistry
 import com.santimattius.resilient.telemetry.ResilientEvent
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
@@ -23,7 +26,6 @@ import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ResilientEngineEventsTest {
-
     // More executions than the event buffer can hold (extraBufferCapacity = 10).
     private val saturatingExecutions = 30
 
@@ -54,9 +56,10 @@ class ResilientEngineEventsTest {
 
             withTimeout(5.seconds) {
                 repeat(saturatingExecutions) {
-                    val failure = assertFailsWith<IllegalStateException> {
-                        policy.execute<Unit> { throw IllegalStateException("boom") }
-                    }
+                    val failure =
+                        assertFailsWith<IllegalStateException> {
+                            policy.execute<Unit> { throw IllegalStateException("boom") }
+                        }
                     assertEquals("boom", failure.message)
                 }
             }
@@ -66,12 +69,14 @@ class ResilientEngineEventsTest {
     fun `given two policies sharing a named global limiter when the second is limited then only the second emits RateLimited`() =
         runTest {
             val registry = RateLimiterRegistry()
-            fun build() = resilient(ResilientScope()) {
-                rateLimiterNamed(registry, "api") {
-                    maxCalls = 1
-                    period = 10.minutes
+
+            fun build() =
+                resilient(ResilientScope()) {
+                    rateLimiterNamed(registry, "api") {
+                        maxCalls = 1
+                        period = 10.minutes
+                    }
                 }
-            }
             val first = build()
             val second = build()
             val firstSeen = mutableListOf<ResilientEvent>()
@@ -87,6 +92,44 @@ class ResilientEngineEventsTest {
 
             assertEquals(1, secondSeen.count { it is ResilientEvent.RateLimited })
             assertEquals(0, firstSeen.count { it is ResilientEvent.RateLimited })
+        }
+
+    @Test
+    fun `given two policies sharing a named bulkhead when the second is rejected then only the second emits BulkheadRejected`() =
+        runTest {
+            val registry = BulkheadRegistry()
+
+            fun build() =
+                resilient(ResilientScope()) {
+                    bulkheadNamed(registry, "api") {
+                        maxConcurrentCalls = 1
+                        maxWaitingCalls = 0
+                    }
+                }
+            val first = build()
+            val second = build()
+            val firstSeen = mutableListOf<ResilientEvent>()
+            val secondSeen = mutableListOf<ResilientEvent>()
+            val firstJob = launch(UnconfinedTestDispatcher(testScheduler)) { first.events.collect { firstSeen += it } }
+            val secondJob = launch(UnconfinedTestDispatcher(testScheduler)) { second.events.collect { secondSeen += it } }
+            val entered = CompletableDeferred<Unit>()
+            val holder =
+                launch {
+                    first.execute {
+                        entered.complete(Unit)
+                        awaitCancellation()
+                    }
+                }
+            entered.await()
+
+            assertFailsWith<BulkheadFullException> { second.execute { } }
+            runCurrent()
+            holder.cancelAndJoin()
+            firstJob.cancelAndJoin()
+            secondJob.cancelAndJoin()
+
+            assertEquals(1, secondSeen.count { it is ResilientEvent.BulkheadRejected })
+            assertEquals(0, firstSeen.count { it is ResilientEvent.BulkheadRejected })
         }
 
     @Test

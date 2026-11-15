@@ -1,6 +1,5 @@
 package com.santimattius.resilient.bulkhead
 
-import kotlin.concurrent.Volatile
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -9,6 +8,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlin.concurrent.Volatile
 
 /**
  * A semaphore-based implementation of the [Bulkhead] pattern.
@@ -35,7 +35,6 @@ class DefaultBulkhead(
     private val config: BulkheadConfig,
     private val onRejected: ((reason: String) -> Unit)? = null,
 ) : Bulkhead {
-
     init {
         require(config.maxConcurrentCalls >= 1) {
             "maxConcurrentCalls must be >= 1, got ${config.maxConcurrentCalls}"
@@ -47,22 +46,37 @@ class DefaultBulkhead(
 
     private val semaphore = Semaphore(config.maxConcurrentCalls)
     private val mutex = Mutex()
+
     @Volatile
     private var queuedWaiters: Int = 0
+
     @Volatile
     private var activeConcurrentCalls: Int = 0
 
-    override fun snapshot(): BulkheadSnapshot = BulkheadSnapshot(
-        activeConcurrentCalls = activeConcurrentCalls,
-        waitingCalls = queuedWaiters,
-        maxConcurrentCalls = config.maxConcurrentCalls,
-        maxWaitingCalls = config.maxWaitingCalls
-    )
+    override fun snapshot(): BulkheadSnapshot =
+        BulkheadSnapshot(
+            activeConcurrentCalls = activeConcurrentCalls,
+            waitingCalls = queuedWaiters,
+            maxConcurrentCalls = config.maxConcurrentCalls,
+            maxWaitingCalls = config.maxWaitingCalls,
+        )
 
-    override suspend fun <T> execute(block: suspend () -> T): T {
+    override suspend fun <T> execute(block: suspend () -> T): T = executeObserved(null, block)
+
+    /**
+     * Like [execute], but also invokes [observer] when this call is rejected. The observer is scoped
+     * to this execution so a bulkhead shared through a [BulkheadRegistry] reports to the policy that
+     * was rejected instead of retaining a reference to the policy that created it.
+     */
+    internal suspend fun <T> executeObserved(
+        observer: ((reason: String) -> Unit)?,
+        block: suspend () -> T,
+    ): T {
         val acquired = tryAcquirePermit()
         if (!acquired) {
-            onRejected?.invoke("Bulkhead full: max concurrent and queue capacity reached")
+            val reason = "Bulkhead full: max concurrent and queue capacity reached"
+            onRejected?.invoke(reason)
+            observer?.invoke(reason)
             throw BulkheadFullException()
         }
         try {
