@@ -12,12 +12,10 @@ package com.santimattius.resilient.circuitbreaker
  * The first [getOrCreate] call for a given [name] wins; subsequent calls return the **same instance**
  * and ignore the [configure] block (document your convention: one name, one config).
  *
- * **Telemetry limitation:** because a [DefaultCircuitBreaker] accepts a single `onStateChanged`
- * callback at construction time, only the *first* policy that registers a name receives state-change
- * events via its [com.santimattius.resilient.ResilientPolicy.events] `SharedFlow`. Policies that reuse
- * an existing registry entry will **not** receive [com.santimattius.resilient.telemetry.ResilientEvent.CircuitStateChanged]
- * events from the shared breaker. Use the registry [DefaultCircuitBreaker.state] `StateFlow` directly
- * for shared observability.
+ * **Telemetry:** a state transition belongs to the shared breaker, not to one caller. Every policy
+ * built on the same entry receives [com.santimattius.resilient.telemetry.ResilientEvent.CircuitStateChanged]
+ * through its [com.santimattius.resilient.ResilientPolicy.events] `SharedFlow`, and any other consumer can
+ * collect [DefaultCircuitBreaker.transitions] directly.
  */
 class CircuitBreakerRegistry {
 

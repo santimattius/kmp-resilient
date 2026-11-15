@@ -138,12 +138,10 @@ class ResilientBuilder {
      * circuit breaker state across those policies. The registry owns the breaker, so closing a
      * policy never resets it.
      *
-     * **Telemetry limitation:** only the first policy that registers a [name] in the registry will
-     * receive [com.santimattius.resilient.telemetry.ResilientEvent.CircuitStateChanged] events via
-     * its `events` [kotlinx.coroutines.flow.SharedFlow]. Subsequent policies reusing the same
-     * registry entry share the breaker state but do not receive telemetry events for it.
-     * Observe the shared breaker directly via [DefaultCircuitBreaker.state] for shared
-     * observability.
+     * **Telemetry:** every policy sharing a [name] receives
+     * [com.santimattius.resilient.telemetry.ResilientEvent.CircuitStateChanged] events via its
+     * `events` [kotlinx.coroutines.flow.SharedFlow], whichever policy's call triggered the
+     * transition. Non-policy consumers can collect [DefaultCircuitBreaker.transitions].
      *
      * Cannot be combined with [circuitBreaker] in the same builder.
      */

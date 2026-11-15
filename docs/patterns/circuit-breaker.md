@@ -253,7 +253,7 @@ val policyB = resilient(scope) {
 - First-name-wins: the first call to `getOrCreate("payments", configure)` creates the breaker; subsequent calls with the same name return the same instance and ignore `configure`.
 - The registry is **not thread-safe** — it is intended as a startup-time construct, created once before any coroutine uses it (same contract as `BulkheadRegistry`).
 - `circuitBreakerNamed` and `circuitBreaker { }` are mutually exclusive in the same builder; combining both throws `IllegalArgumentException`.
-- Only the first policy that registers a name receives `CircuitStateChanged` telemetry events via `policy.events`. Subsequent policies sharing the same entry share breaker state but not the telemetry callback — observe shared state directly via the registry or `DefaultCircuitBreaker.state`.
+- Every policy sharing a registry entry receives `CircuitStateChanged` via `policy.events` for transitions that happen while the policy is open, whichever policy's call triggered them. For consumers that are not a policy, collect `DefaultCircuitBreaker.transitions` (ordered, carries the previous state) or `DefaultCircuitBreaker.state`.
 
 ---
 

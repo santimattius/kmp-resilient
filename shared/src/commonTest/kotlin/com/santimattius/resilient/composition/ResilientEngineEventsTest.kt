@@ -2,6 +2,8 @@ package com.santimattius.resilient.composition
 
 import com.santimattius.resilient.bulkhead.BulkheadFullException
 import com.santimattius.resilient.bulkhead.BulkheadRegistry
+import com.santimattius.resilient.circuitbreaker.CircuitBreakerRegistry
+import com.santimattius.resilient.circuitbreaker.CircuitState
 import com.santimattius.resilient.ratelimiter.RateLimitExceededException
 import com.santimattius.resilient.ratelimiter.RateLimiterRegistry
 import com.santimattius.resilient.telemetry.ResilientEvent
@@ -128,5 +130,34 @@ class ResilientEngineEventsTest {
 
             assertEquals(1, secondSeen.count { it is ResilientEvent.BulkheadRejected })
             assertEquals(0, firstSeen.count { it is ResilientEvent.BulkheadRejected })
+        }
+
+    @Test
+    fun `given two policies sharing a named circuit breaker when it opens then both emit CircuitStateChanged`() =
+        runTest {
+            val registry = CircuitBreakerRegistry()
+            // Run the engine's forwarding collector on the test scheduler so the assertion is deterministic.
+            fun build() = resilient(ResilientScope(UnconfinedTestDispatcher(testScheduler))) {
+                circuitBreakerNamed(registry, "payments") {
+                    failureThreshold = 1
+                    timeout = 10.minutes
+                }
+            }
+            val first = build()
+            val second = build()
+            val firstSeen = mutableListOf<ResilientEvent>()
+            val secondSeen = mutableListOf<ResilientEvent>()
+            val firstJob = launch(UnconfinedTestDispatcher(testScheduler)) { first.events.collect { firstSeen += it } }
+            val secondJob = launch(UnconfinedTestDispatcher(testScheduler)) { second.events.collect { secondSeen += it } }
+
+            // The second policy triggers the transition; the first one created the registry entry.
+            assertFailsWith<IllegalStateException> { second.execute<Unit> { throw IllegalStateException("boom") } }
+            runCurrent()
+            firstJob.cancelAndJoin()
+            secondJob.cancelAndJoin()
+
+            val expected = ResilientEvent.CircuitStateChanged(CircuitState.CLOSED, CircuitState.OPEN)
+            assertEquals(listOf(expected), firstSeen.filterIsInstance<ResilientEvent.CircuitStateChanged>())
+            assertEquals(listOf(expected), secondSeen.filterIsInstance<ResilientEvent.CircuitStateChanged>())
         }
 }
