@@ -39,6 +39,33 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 
 CI runs `./gradlew :shared:check` on every push and pull request to `main`.
 
+### Benchmark smoke checks
+
+Run these from the repository root with JDK 21 and Node installed. The final command requires an Apple Silicon Mac with Xcode tools. The repository path must not contain spaces: the generated Node runner splits its config argument on spaces. Keep the generated npm package tree in place.
+
+```bash
+./gradlew :benchmark:compileKotlinJs
+./gradlew :benchmark:jsNodeTest
+BENCHMARK_REQUIRE_INSTALLED=1 node --test benchmark/scripts.test.cjs
+boundary="benchmark/build/js-smoke-boundary-$(date +%s)-$$.json"
+node benchmark/verify-js-report.cjs begin "$boundary"
+./gradlew :benchmark:jsSmokeBenchmark --rerun-tasks
+node benchmark/verify-js-report.cjs verify "$boundary"
+node benchmark/verify-js-failure.cjs "$boundary"
+./gradlew :benchmark:jvmSmokeBenchmark
+./gradlew :benchmark:compileKotlinMacosArm64
+```
+
+Each command must exit zero; stop if one fails. Start a new boundary for each smoke invocation. The smoke task exports its actual Node executable, npm working directory, runner, preload and config after successful execution; the checker rejects stale reports or invocation metadata. The failure harness directly replays that runner with a separate config/report, requires the intentional rejection marker and a nonzero subprocess exit, and kills its owned process group after five minutes.
+
+The report checker requires every suite, method and parameter and expects the JS JSON report to use the JMH-style `benchmark`, `params`, and `primaryMetric.score` fields. Check this assumption against the generated JS report if it rejects a successful smoke run.
+
+For issue #79's **pre-fix baseline**, run `./gradlew :benchmark:compileKotlinJs` against the original unmodified base and record the exit code and concise errors. Running it on a modified tree is not a baseline.
+
+The smoke configuration uses one warmup: on JS, kotlinx-benchmark maps this value to benchmark.js `initCount`, which must be positive for deferred benchmarks to progress. This also adds one JVM smoke warmup iteration.
+
+JS entries include Promise and event-loop scheduling overhead. The open-breaker benchmark also awaits preparation on first use; compare JS numbers within JS, not directly with blocking JVM/macOS numbers. JS contention represents interleaved event-loop coroutines, not multithreaded CPU contention.
+
 ## Project Structure
 
 | Module | Purpose |
