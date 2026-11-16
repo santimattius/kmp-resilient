@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Benchmark smoke coverage now includes asynchronous Node.js benchmarks alongside the existing JVM run; JS results include Promise and event-loop scheduling overhead.
 - Policies sharing a `circuitBreakerNamed` entry now all receive `CircuitStateChanged` (previously only the policy that first created the entry did).
 
 ---

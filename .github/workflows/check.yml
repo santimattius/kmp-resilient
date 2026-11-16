@@ -24,6 +24,7 @@ jobs:
   benchmark:
     name: Benchmark Smoke
     runs-on: macOS-latest
+    timeout-minutes: 25
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -32,6 +33,24 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 21
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Compile and test JS benchmarks
+        run: ./gradlew :benchmark:compileKotlinJs :benchmark:jsNodeTest
+      - name: Check smoke helpers and benchmark.js regression
+        env:
+          BENCHMARK_REQUIRE_INSTALLED: '1'
+        run: node --test benchmark/scripts.test.cjs
+      - name: Run and verify JS benchmark smoke
+        timeout-minutes: 10
+        run: |
+          boundary="benchmark/build/js-smoke-boundary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json"
+          node benchmark/verify-js-report.cjs begin "$boundary"
+          ./gradlew :benchmark:jsSmokeBenchmark --rerun-tasks
+          node benchmark/verify-js-report.cjs verify "$boundary"
+          node benchmark/verify-js-failure.cjs "$boundary"
       - name: Run benchmark smoke
         run: ./gradlew :benchmark:jvmSmokeBenchmark
       - name: Upload benchmark results
