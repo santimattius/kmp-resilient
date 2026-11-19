@@ -4,7 +4,7 @@
 
 A **typed policy** executes a block with an explicit input value: `resilientFor<Input> { }` returns a `TypedResilientPolicy<Input>` and `execute(input) { input -> ... }` runs the block under the configured policies. The same input is passed to every attempt. A **resilience template** is an immutable, context-free set of policy definitions created with `resilienceTemplate { }` and pulled into any build with `include(template)`.
 
-Both reuse the engine behind `resilient { }`: same default composition order, retry, timeout, fallback, cache, telemetry and cancellation behavior, and exactly one operation success/failure event per execution. `Input` is plain execution data; `ResilientScope` stays reserved for coroutine lifecycle.
+Both reuse the engine behind `resilient { }`: same default composition order, retry, timeout, fallback, cache, telemetry and cancellation behavior. Each execution attempts one terminal success/failure event without blocking the caller's result or exception; delivery is best-effort and can be dropped when the buffer is full or no subscriber is present. `Input` is plain execution data; `ResilientScope` stays reserved for coroutine lifecycle.
 
 ## When to apply
 
@@ -127,7 +127,7 @@ Migration notes:
 - **Type arguments:** the standalone `keyedRateLimiter<Request, String>` takes the input and key types; inside `resilientFor<Request>` the input type is already known, so only the key type is declared.
 - **Order:** the nesting above consumes global quota first. The default typed order does the same (global outside keyed). To reverse it, use `compositionOrder(...)` instead of swapping the nesting.
 - **Shared quotas:** a limiter shared by several call sites becomes a named registry entry (`rateLimiterNamed`, `keyedRateLimiterNamed`). Building the policy twice from an ordinary `rateLimiter { }` or `keyedRateLimiter { }` creates independent quotas.
-- **Observability:** the pipeline emits one operation success/failure event per execution and exposes separate snapshots (`getHealthSnapshot().rateLimiter` and `getKeyedRateLimiterSnapshot()`).
+- **Observability:** the pipeline attempts one best-effort operation success/failure event per execution and exposes separate snapshots (`getHealthSnapshot().rateLimiter` and `getKeyedRateLimiterSnapshot()`).
 - **Lifecycle:** `close()` releases state owned by the policy; registry-owned state survives.
 - **Compatibility:** existing standalone limiters and `resilient { }` keep working unchanged; migrate call sites incrementally.
 

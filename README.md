@@ -65,12 +65,15 @@ Observe runtime events from `policy.events` (SharedFlow):
 - **RetryAttempt**(attempt, error)
 - **CircuitStateChanged**(from, to)
 - **RateLimited**(waitTime)
+- **KeyedRateLimited** (keyless; no wait time)
 - **BulkheadRejected**(reason)
 - **CacheHit**(key) / **CacheMiss**(key)
 - **TimeoutTriggered**(timeout)
 - **FallbackTriggered**(error)
 - **HedgingUsed**(attemptIndex)
 - **OperationSuccess**(duration) / **OperationFailure**(error, duration)
+
+Each execution attempts one terminal success or failure event without blocking its result or exception. Delivery is best-effort: the event can be dropped if the buffer is full or no subscriber is present. Exported terminal counters therefore may undercount executions.
 
 ```kotlin
 val job = scope.launch {
@@ -80,7 +83,8 @@ val job = scope.launch {
 
 ## Composition Order
 Outer → Inner (default):
-- Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → Block
+- Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Keyed Rate Limiter → Bulkhead → Hedging → Block
+- The Keyed Rate Limiter stage applies only to `resilientFor` when configured; untyped `resilient` does not support it.
 - Fallback wraps outermost to handle failures after all policies.
 
 ### Custom Composition Order
@@ -612,6 +616,7 @@ exportJob.cancel()
 | `resilient.retry.attempts` | `RetryAttempt` |
 | `resilient.circuit_breaker.state_changes` | `CircuitStateChanged` |
 | `resilient.rate_limiter.limited` | `RateLimited` |
+| `resilient.keyed_rate_limiter.limited` | `KeyedRateLimited` |
 | `resilient.bulkhead.rejected` | `BulkheadRejected` |
 | `resilient.operation.success` | `OperationSuccess` |
 | `resilient.operation.failure` | `OperationFailure` |

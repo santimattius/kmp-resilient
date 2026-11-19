@@ -182,4 +182,4 @@ Use Bulkhead when you need to cap *how many operations run at the same time*. Us
 - [Rate Limiter](rate-limiter.md) — rate-based throttling
 - [Circuit Breaker](circuit-breaker.md) — stop calling a failing dependency
 - [Fallback](fallback.md) — graceful degradation when bulkhead rejects
-- [INDEX](../INDEX.md) — full pattern index
+- [Pattern index](../README.md)

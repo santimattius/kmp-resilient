@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - Policies sharing a `circuitBreakerNamed` entry now all receive `CircuitStateChanged` (previously only the policy that first created the entry did).
+- A `bulkheadNamed` rejection is attributed to the policy whose execution was rejected, rather than the policy that first created the shared entry.
 - **Rate Limiter**
   - Concurrent waiters now receive at most one refilled permit per configured window while sharing the original timeout budget.
   - A limiter shared through `RateLimiterRegistry` (`rateLimiterNamed`) now emits `ResilientEvent.RateLimited` on the `events` of the policy whose execution was limited, instead of on the policy that first created the entry, and no longer retains a reference to that policy.
@@ -39,6 +40,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Benchmark smoke coverage now includes asynchronous Node.js benchmarks alongside the existing JVM run; JS results include Promise and event-loop scheduling overhead.
+- Terminal operation success/failure events are attempted without blocking the caller's result or exception; delivery is best-effort and may be dropped when the buffer is full or no subscriber is present.
+- The addition of `OrderablePolicyType.KEYED_RATE_LIMITER` requires consumers to update exhaustive `when` expressions over `OrderablePolicyType`.
 - **Telemetry (source-incompatible for exhaustive `when`)**
   - New sealed subtype `ResilientEvent.KeyedRateLimited` (keyless). Consumers that exhaustively match `ResilientEvent` must handle it; the OpenTelemetry and Micrometer exporters now count it. This is binary compatible and is released as a minor version.
 - **Build**

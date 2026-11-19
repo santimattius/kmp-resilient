@@ -210,4 +210,4 @@ If `cleanupInterval` is not set, no background job is started and `close()` is a
 - [Timeout](timeout.md) — enforce a deadline on the cache-miss execution path
 - [Fallback](fallback.md) — return stale or default data when the underlying call fails
 - [Hedging](hedging.md) — reduce latency on cache misses with parallel attempts
-- [INDEX](../INDEX.md) — full pattern index
+- [Pattern index](../README.md)

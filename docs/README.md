@@ -90,8 +90,10 @@ The outermost safety net: when every other policy has been exhausted and the ope
 The default execution order (outer → inner) is:
 
 ```
-Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Bulkhead → Hedging → block
+Fallback → Cache → Coalesce → Timeout → Retry → Circuit Breaker → Rate Limiter → Keyed Rate Limiter → Bulkhead → Hedging → block
 ```
+
+The Keyed Rate Limiter stage applies only to `resilientFor` when configured; untyped `resilient` does not support it.
 
 The order is fully customizable via `compositionOrder(listOf(...))`. See [Retry](patterns/retry.md) and the main [README](../README.md) for trade-off examples such as *global timeout* vs *per-attempt timeout*.
 

@@ -196,4 +196,4 @@ If you configure a custom composition order, Fallback is still automatically pla
 - [Circuit Breaker](circuit-breaker.md) — Fallback's primary partner: stops cascade, Fallback provides the alternative
 - [Cache](cache.md) — a common fallback source: return cached/stale data
 - [Retry](retry.md) — exhaust retries before Fallback activates
-- [INDEX](../INDEX.md) — full pattern index
+- [Pattern index](../README.md)
