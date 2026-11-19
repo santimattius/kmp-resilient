@@ -155,4 +155,4 @@ policy.events.collect { event ->
 - [Retry](retry.md) — re-execute on failure, with optional `perAttemptTimeout`
 - [Circuit Breaker](circuit-breaker.md) — stop calling a downstream that is already failing
 - [Fallback](fallback.md) — produce a safe value after timeout propagates
-- [INDEX](../INDEX.md) — full pattern index
+- [Pattern index](../README.md)

@@ -260,4 +260,4 @@ Use Rate Limiter when you care about *how many calls per unit of time*. Use [Bul
 - [Bulkhead](bulkhead.md) — concurrency limiting
 - [Circuit Breaker](circuit-breaker.md) — stop calling a failing downstream
 - [Retry](retry.md) — retry after a 429 / transient failure
-- [INDEX](../INDEX.md) — full pattern index
+- [Pattern index](../README.md)

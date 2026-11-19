@@ -30,8 +30,9 @@ import kotlinx.coroutines.flow.SharedFlow
  * `Input` is plain execution data handed to the protected block; it is unrelated to
  * [ResilientScope], which stays reserved for coroutine lifecycle. A typed policy is backed by the
  * same internal composition engine as [com.santimattius.resilient.ResilientPolicy], so behavior
- * (ordering, retry, timeout, fallback, cache, telemetry, cancellation) is identical, and one
- * execution emits exactly one operation success/failure event.
+ * (ordering, retry, timeout, fallback, cache, telemetry, cancellation) is identical. Each execution
+ * attempts one terminal success/failure event without blocking the result or exception; delivery is
+ * best-effort and may be dropped if the buffer is full or no subscriber is present.
  *
  * ```kotlin
  * val baseline = resilienceTemplate { timeout { timeout = 2.seconds } }

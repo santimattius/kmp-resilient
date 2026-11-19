@@ -169,4 +169,4 @@ p99=200ms               →  p99 becomes ≈ max(50ms, time for attempt 2) ≈ 5
 - [Timeout](timeout.md) — enforce a hard deadline on each hedged attempt
 - [Circuit Breaker](circuit-breaker.md) — protect downstream from amplified hedging load
 - [Retry](retry.md) — sequential re-attempts vs parallel hedging
-- [INDEX](../INDEX.md) — full pattern index
+- [Pattern index](../README.md)

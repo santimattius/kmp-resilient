@@ -235,4 +235,4 @@ policy.events.collect { event ->
 - [Timeout](timeout.md) — global or per-attempt deadline
 - [Circuit Breaker](circuit-breaker.md) — stop retrying when a dependency is down
 - [Fallback](fallback.md) — produce a safe value after all retries are exhausted
-- [INDEX](../INDEX.md) — full pattern index
+- [Pattern index](../README.md)
