@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 ## [Unreleased]
 
+### Documentation
+
+- Clarify circuit breaker current-state observation via `state` versus replay-free transition events, including late-subscriber behavior and a shared-registry example.
+
 ---
 ## [2.1.0] - 2026-11-19
 
