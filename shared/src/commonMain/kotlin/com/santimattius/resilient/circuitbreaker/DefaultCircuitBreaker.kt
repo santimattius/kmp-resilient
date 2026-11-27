@@ -106,8 +106,12 @@ class DefaultCircuitBreaker(
      * the previous state, so any number of consumers (for example every policy sharing this breaker
      * through a [CircuitBreakerRegistry]) can observe the same transitions.
      *
-     * Hot, no replay: a collector only sees transitions that happen after it subscribes. A collector that
-     * falls more than 64 transitions behind skips the oldest ones instead of blocking the breaker.
+     * Hot, no replay: a collector only sees transitions that happen after it subscribes. For the current
+     * state, collect [state] instead: it immediately delivers the latest state even when the breaker
+     * opened before subscription. Read `state.value` for a point-in-time value. State is conflated, so
+     * use this transition stream rather than [state] when counting observed transitions for metrics.
+     * A collector that falls more than 64 transitions behind skips the oldest ones instead of blocking
+     * the breaker.
      */
     val transitions: SharedFlow<CircuitStateTransition> get() = _transitions.asSharedFlow()
 

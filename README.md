@@ -222,7 +222,9 @@ val policyB = resilient(scope) {
     circuitBreakerNamed(circuitBreakers, "payments") { } // same instance as policyA
 }
 ```
-→ [In-depth documentation](docs/patterns/circuit-breaker.md)
+**Current state vs. events:** `breaker.state` is a `StateFlow<CircuitState>` that immediately delivers the current state to late subscribers, even if the circuit is already `OPEN`; use `breaker.state.value` for a one-off read. `breaker.transitions` and `policy.events` are `SharedFlow`s with no replay, so they only deliver transitions/events after subscription. Observe `state` for UI/current-state gauges and `transitions` for transition logs/counters; state is conflated and is not a transition history. The state flow belongs to the breaker, not directly to `ResilientPolicy`.
+
+→ [In-depth documentation and observation example](docs/patterns/circuit-breaker.md#observing-current-state-and-transitions)
 
 ### Rate Limiter
 Token-bucket rate limiting: tokens refill at the **start of each period** (fixed-window refill). With `maxCalls = 10` and `period = 1.seconds`, at most 10 calls per second are allowed. One bucket per policy (global limit). Optional max wait when limited.

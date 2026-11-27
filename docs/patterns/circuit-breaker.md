@@ -278,7 +278,43 @@ get("/health") {
 
 ---
 
-## Observing Circuit Breaker Events
+## Observing Current State and Transitions
+
+In 2.1.0, the breaker exposes both current state and transition events. Choose the stream based on what the consumer needs:
+
+| API | Late subscriber receives | Use for |
+|---|---|---|
+| `breaker.state: StateFlow<CircuitState>` | The current state immediately, including `OPEN` if the breaker opened before subscription | UI, health indicators, and current-state gauges |
+| `breaker.transitions: SharedFlow<CircuitStateTransition>` | Only transitions after subscription (`replay = 0`) | Transition logs and counters |
+| `policy.events: SharedFlow<ResilientEvent>` | Only events after subscription (`replay = 0`) | Policy telemetry, including `CircuitStateChanged` |
+
+`state` is exposed on the breaker, not directly on `ResilientPolicy`. With the shared registry from the example above, retrieve the same instance **after configuring it**:
+
+```kotlin
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+
+val breaker = circuitBreakers.getOrCreate("payments") {} // Already configured by policyA
+
+val currentState = breaker.state.value // Point-in-time read; no collector needed
+
+scope.launch {
+    breaker.state.collect { state ->
+        // Receives the current state even if the breaker opened before this collector started
+        println("Current circuit state: $state")
+    }
+}
+
+scope.launch {
+    breaker.transitions.collect { transition ->
+        println("Circuit transition: ${transition.from} → ${transition.to}")
+    }
+}
+```
+
+`StateFlow` is conflated: a slow collector may skip intermediate states, so do not use it to count transitions. `transitions` has no replay and a 64-transition buffer; a slow collector that falls further behind loses the oldest transitions. Neither transition stream is a durable event history. A late subscriber does not need a separate state holder: use `state` rather than reconstructing the current state from events. For a one-off query through the policy, use `policy.getHealthSnapshot().circuitBreaker?.state`.
+
+To observe circuit transitions as part of policy telemetry:
 
 ```kotlin
 import com.santimattius.resilient.telemetry.ResilientEvent
